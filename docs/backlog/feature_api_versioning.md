@@ -7,10 +7,10 @@ The current EDINET API implementation does not specify the API version in the re
 **Acceptance Criteria**
 
 - All EDINET API requests must include `/api/v2/` in the URL path.
-- The base URL constants in the application should be updated to reflect this change.
+- The base URL config in the application should be updated to reflect this change.
 - Existing tests should pass, and new tests should be added to verify that the correct URL is being called.
 
 **Technical Details**
 
-- Update `EDINET_API_BASE_URL` in `src/constants.py` to `https://api.edinet-fsa.go.jp/api/v2`.
-- Update `EDINET_DOCUMENT_API_BASE_URL` in `src/constants.py` to `https://api.edinet-fsa.go.jp/api/v2`.
+- Update `EDINET_API_BASE_URL` in `src/config.py` to `https://api.edinet-fsa.go.jp/api/v2`.
+- Update `EDINET_DOCUMENT_API_BASE_URL` in `src/config.py` to `https://api.edinet-fsa.go.jp/api/v2`.

@@ -3,20 +3,12 @@ import json
 import logging
 import sys
 
-from src.config import DAYS_BACK
-from src.constants import DEFAULT_DOWNLOAD_DIR, SUPPORTED_DOC_TYPES
-from src.edinet.edinet_tools import download_documents
-from src.logging_config import setup_logging
-from src.services import (
-    get_most_recent_documents,
-    get_structured_data_for_company_date_range,
-    get_structured_data_from_zip_directory,
-)
-from src.utils import print_header
+from src.config import DAYS_BACK, DEFAULT_DOWNLOAD_DIR, SUPPORTED_DOC_TYPES
+from src.edinet.client import EdinetClient
+from src.edinet.utils import setup_logging
 
 setup_logging()
 logger = logging.getLogger(__name__)
-
 
 def parse_args():
     """Parse command line arguments."""
@@ -59,12 +51,12 @@ def run_company_date_range_query(args):
         logger.info(f"Filtering for document types: {doc_type_codes}")
 
     try:
+        edinet_client = EdinetClient()
         # Call the new function
-        structured_data = get_structured_data_for_company_date_range(
+        structured_data = edinet_client.get_structured_data_for_company_date_range(
             edinet_code=args.edinet_code,
             start_date=args.start_date,
-            end_date=args.end_date,
-            doc_type_codes=doc_type_codes,
+            end_date=args.end_date
         )
 
         # Convert to JSON
@@ -88,7 +80,9 @@ def run_company_date_range_query(args):
 
 def run_demo() -> None:
     """Runs the main demo workflow."""
-    print_header()
+    logger.info("=" * 80)
+    logger.info("EDINET API x Structured LLM Analysis Demo")
+    logger.info("=" * 80)
 
     logger.info("Initializing...")
 
@@ -105,8 +99,10 @@ def run_demo() -> None:
 
     days_back = DAYS_BACK
 
+    edinet_client = EdinetClient()
+
     # Fetch the most recent documents of the specified types
-    docs_metadata, found_date = get_most_recent_documents(
+    docs_metadata, found_date = edinet_client.get_most_recent_documents(
         doc_type_codes_to_fetch,
         days_back=days_back,
     )
@@ -120,14 +116,14 @@ def run_demo() -> None:
     download_dir = DEFAULT_DOWNLOAD_DIR
 
     # download_documents function handles creating the directory
-    download_documents(docs_metadata, download_dir)
+    edinet_client.download_documents(docs_metadata, download_dir)
 
     logger.info(f"\nProcessing downloaded documents from {found_date}...")
 
     # Process the downloaded zip files into structured data
     # We pass the keys of SUPPORTED_DOC_TYPES because get_structured_data_from_zip_directory
     # uses process_raw_csv_data which dispatches based on these codes.
-    structured_document_data_list = get_structured_data_from_zip_directory(
+    structured_document_data_list = edinet_client.get_structured_data_from_zip_directory(
         download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
     )
 

@@ -1,7 +1,6 @@
-# document_processors.py
 import logging
 
-from src.constants import EXTRAORDINARY_REPORT_ELEMENT_IDS
+from src.config import EXTRAORDINARY_REPORT_ELEMENT_IDS
 from src.processors.base_processor import BaseDocumentProcessor, StructuredDocumentData
 
 logger = logging.getLogger(__name__)

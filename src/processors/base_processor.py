@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Any
 
-from src.constants import TEXT_REPLACEMENTS, XBRL_ELEMENT_IDS
+from src.config import TEXT_REPLACEMENTS, XBRL_ELEMENT_IDS
 
 logger = logging.getLogger(__name__)
 

@@ -6,33 +6,80 @@ import tempfile
 import zipfile
 from typing import Any
 
+import chardet
 import pandas as pd
 
-from src.constants import (
+from src.config import (
     AUDITOR_REPORT_PREFIX,
+    CSV_ENCODING_DETECTION_BYTES,
     CSV_EXTENSION,
     CSV_SEPARATOR,
+    DAYS_BACK,
     MACOS_METADATA_DIR,
     SUPPORTED_DOC_TYPES,
     ZIP_EXTENSION,
 )
-from src.edinet.edinet_tools import (
-    download_documents,
-    fetch_document,
-    get_documents_for_date_range,
-)
-from src.error_handlers import ErrorContext, log_exceptions
-from src.logging_config import setup_logging
+from src.edinet.client import EdinetClient
+from src.edinet.schemas import ErrorContext
+from src.edinet.utils import setup_logging
 from src.processors.base_processor import StructuredDocumentData
 from src.processors.extraordinary_processor import ExtraordinaryReportProcessor
 from src.processors.generic_processor import GenericReportProcessor
 from src.processors.semiannual_processor import SemiAnnualReportProcessor
-from src.utils import read_csv_file
 
-from .config import DAYS_BACK
+edinet_client = EdinetClient()
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+def read_csv_file(file_path: str) -> list[dict[str, str | None]] | None:
+    """Read a tab-separated CSV file trying multiple encodings."""
+    try:
+        # Detect encoding
+        with open(file_path, "rb") as file:
+            raw_data = file.read(CSV_ENCODING_DETECTION_BYTES)
+        result = chardet.detect(raw_data)
+        detected_encoding = result["encoding"]
+    except OSError:
+        detected_encoding = None
+
+    # Try different encodings
+    encodings = [detected_encoding] if detected_encoding else []
+    encodings.extend(
+        [
+            "utf-16",
+            "utf-16le",
+            "utf-16be",
+            "utf-8",
+            "shift-jis",
+            "euc-jp",
+            "iso-8859-1",
+            "windows-1252",
+        ]
+    )
+
+    for encoding in list(dict.fromkeys(encodings)):  # Remove duplicates
+        if not encoding:
+            continue
+        try:
+            df = pd.read_csv(
+                file_path,
+                encoding=encoding,
+                sep=CSV_SEPARATOR,
+                dtype=str,
+                low_memory=False,
+            )
+            # Replace NaN with None
+            df = df.replace({float("nan"): None, "": None})
+            return df.to_dict(orient="records")  # type: ignore[return-value]
+        except (UnicodeDecodeError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            continue
+        except Exception:
+            continue
+
+    logger.error(f"Failed to read {file_path}. Unable to determine correct encoding.")
+    return None
 
 
 def get_most_recent_documents(
@@ -72,7 +119,7 @@ def get_most_recent_documents(
         logger.info(f"Fetching documents for {date_to_check}...")
         try:
             # Get documents for a single date
-            docs = get_documents_for_date_range(
+            docs = edinet_client.get_documents_for_date_range(
                 date_to_check,
                 date_to_check,
                 doc_type_codes=doc_type_codes,
@@ -104,7 +151,6 @@ def get_most_recent_documents(
     return [], None
 
 
-@log_exceptions(logger, reraise=False, return_value=None)
 def get_structured_document_data_from_raw_csv(
     raw_csv_data: list[dict[str, Any]],
     doc_id: str,
@@ -457,7 +503,7 @@ def get_structured_data_directly_from_api(
 
     try:
         # Fetch document bytes from API
-        doc_bytes = fetch_document(doc_id)
+        doc_bytes = edinet_client.fetch_document(doc_id)
 
         # Process directly in memory
         return get_structured_data_from_zip_bytes(doc_bytes, doc_id, doc_type_code)
@@ -465,7 +511,6 @@ def get_structured_data_directly_from_api(
     except Exception as e:
         logger.error(f"Error fetching and processing document {doc_id}: {e}")
         return None
-
 
 
 def get_structured_data_for_company_date_range(
@@ -540,7 +585,7 @@ def get_structured_data_for_company_date_range(
     logger.info(f"Using download directory: {download_dir}")
 
     # Fetch documents for the company within the date range
-    docs_metadata = get_documents_for_date_range(
+    docs_metadata = edinet_client.get_documents_for_date_range(
         start_date=start_date_parsed,
         end_date=end_date_parsed,
         edinet_codes=[edinet_code],  # Filter by single EDINET code
@@ -558,7 +603,7 @@ def get_structured_data_for_company_date_range(
     logger.info(f"Found {len(docs_metadata)} documents for {edinet_code}")
 
     # Download the documents
-    download_documents(docs_metadata, download_dir)
+    edinet_client.download_documents(docs_metadata, download_dir)
 
     # Process the downloaded zip files into structured data
     # Use all supported document types for processing
