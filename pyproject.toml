@@ -1,56 +1,17 @@
 [project]
-name = "edinet-api-tools"
+name = "edinet-sdk"
 version = "0.1.0"
-description = "Edinet API parser tool with LLM analysis"
+description = "Edinet API data handling SDK"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "annotated-types",
-  "anyio",
-  "certifi",
-  "chardet",
-  "charset-normalizer",
-  "click",
-  "click-default-group",
-  "colorama",
-  "condense-json",
-  "distro",
-  "flake8",
-  "h11",
-  "httpcore",
   "httpx",
-  "idna",
-  "jiter",
-  "llm",
-  "mccabe",
-  "mypy-extensions",
-  "numpy",
-  "openai",
-  "packaging",
   "pandas",
-  "pathspec",
-  "platformdirs",
-  "pluggy",
-  "puremagic",
-  "pycodestyle",
   "pydantic",
-  "pydantic_core",
-  "pyflakes",
   "python-dateutil",
   "python-dotenv",
-  "python-ulid",
-  "pytz",
-  "PyYAML",
-  "six",
-  "sniffio",
-  "sqlite-fts4",
-  "sqlite-migrate",
-  "sqlite-utils",
-  "tabulate",
   "tqdm",
-  "typing-inspection",
   "typing_extensions",
-  "tzdata",
 ]
 
 [dependency-groups]

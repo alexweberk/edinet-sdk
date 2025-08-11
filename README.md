@@ -1,5 +1,36 @@
 # EDINET SDK
-A simple wrapper around the EDINET API for handling with Python.
+
+A Python SDK for fetching and processing Japanese corporate financial disclosure documents from the EDINET API.
+
+## Setup
+
+1. Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+2. Install dependencies: `uv sync`
+3. Create a `.env` file and set your `EDINET_API_KEY`
+4. Run the CLI: `uv run python main.py`
+
+## CLI Usage
+
+**Demo mode (fetches recent documents):**
+```bash
+uv run python main.py
+```
+
+**Company date range query:**
+```bash
+uv run python main.py --edinet-code <EDINET_CODE> --start-date <YYYY-MM-DD> --end-date <YYYY-MM-DD>
+```
+
+**Optional flags:**
+- `--doc-types`: Comma-separated document type codes (e.g., "160,180")
+- `--output`: Output file path for JSON results
+
+## Development
+
+```bash
+uv run ruff check .      # Linting
+uv run ruff format .     # Formatting
+```
 
 
 ## Disclaimer

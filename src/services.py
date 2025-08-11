@@ -22,7 +22,6 @@ from src.edinet.edinet_tools import (
     get_documents_for_date_range,
 )
 from src.error_handlers import ErrorContext, log_exceptions
-from src.llm_tools import TOOL_MAP
 from src.logging_config import setup_logging
 from src.processors.base_processor import StructuredDocumentData
 from src.processors.extraordinary_processor import ExtraordinaryReportProcessor
@@ -467,38 +466,6 @@ def get_structured_data_directly_from_api(
         logger.error(f"Error fetching and processing document {doc_id}: {e}")
         return None
 
-
-def analyze_document_data(
-    structured_data: StructuredDocumentData, tool_name: str
-) -> str | None:
-    """
-    Analyze structured document data using the specified LLM tool.
-
-    Args:
-        structured_data: Structured dictionary of the document's data.
-        tool_name: Name of the tool to use (key in TOOL_MAP).
-
-    Returns:
-        Formatted string output from the tool, or None if analysis failed.
-    """
-    if tool_name not in TOOL_MAP:
-        logger.error(f"Unknown LLM analysis tool: {tool_name}")
-        return f"Error: Unknown analysis tool '{tool_name}'"
-
-    tool_class = TOOL_MAP[tool_name]
-    tool_instance = tool_class()  # Create an instance of the tool
-
-    logger.info(
-        f"Attempting to generate '{tool_name}' analysis for doc_id: {structured_data.get('doc_id', 'N/A')}"
-    )
-    formatted_output = tool_instance.generate_formatted_text(structured_data)
-
-    if formatted_output:
-        logger.info(f"Successfully generated '{tool_name}' analysis.")
-        return formatted_output
-    else:
-        logger.error(f"Failed to generate '{tool_name}' analysis.")
-        return f"Analysis Failed for '{tool_name}'"
 
 
 def get_structured_data_for_company_date_range(
