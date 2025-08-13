@@ -41,7 +41,7 @@ def clean_text(text: str | None) -> str | None:
     return text
 
 
-class BaseDocumentProcessor:
+class BaseProcessor:
     """Base class for document specific data extraction."""
 
     def __init__(
@@ -51,7 +51,7 @@ class BaseDocumentProcessor:
         doc_type_code: str,
     ) -> None:
         """
-        Initialize with raw data from CSV files and document metadata.
+        Takes bytes of a zipfile or a zip file path and converts it into structured data.
 
         Args:
             raw_csv_data: List of dictionaries, each containing 'filename' and 'data' (list of rows/dicts).

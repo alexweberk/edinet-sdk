@@ -317,16 +317,14 @@ class EdinetClient:
         Returns:
             Structured dictionary of the document's data, or None if processing failed.
         """
-        from src.processors.base_processor import BaseDocumentProcessor
+        from src.processors.base_processor import BaseProcessor
 
         try:
             # Fetch document bytes from API
             doc_bytes = self.get_doc(doc_id)
 
             # Process directly in memory
-            return BaseDocumentProcessor.process_zip_bytes(
-                doc_bytes, doc_id, doc_type_code
-            )
+            return BaseProcessor.process_zip_bytes(doc_bytes, doc_id, doc_type_code)
 
         except Exception as e:
             self.logger.error(f"Error fetching and processing document {doc_id}: {e}")
@@ -347,7 +345,7 @@ class EdinetClient:
         Validates dates (YYYY-MM-DD if str), ensures start_date <= end_date,
         fetches documents via list_docs filtered by the given edinet_code,
         downloads ZIPs to a target directory (create a subdir if download_dir is None),
-        and converts ZIPs to structured dicts using BaseDocumentProcessor.process_zip_directory.
+        and converts ZIPs to structured dicts using BaseProcessor.process_zip_directory.
 
         Args:
             edinet_code: EDINET code for the company to fetch documents for
@@ -361,7 +359,7 @@ class EdinetClient:
         Returns:
             List of structured dictionaries (one per processed document).
         """
-        from src.processors.base_processor import BaseDocumentProcessor
+        from src.processors.base_processor import BaseProcessor
 
         # Parse and validate dates
         if isinstance(start_date, str):
@@ -430,7 +428,7 @@ class EdinetClient:
 
         # Process the downloaded zip files into structured data
         # Use all supported document types for processing
-        structured_document_data_list = BaseDocumentProcessor.process_zip_directory(
+        structured_document_data_list = BaseProcessor.process_zip_directory(
             download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
         )
 

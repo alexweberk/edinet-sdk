@@ -1,12 +1,12 @@
 # document_processors.py
 import logging
 
-from src.processors.base_processor import BaseDocumentProcessor, StructuredDocData
+from src.processors.base_processor import BaseProcessor, StructuredDocData
 
 logger = logging.getLogger(__name__)
 
 
-class SemiAnnualReportProcessor(BaseDocumentProcessor):
+class SemiAnnualReportProcessor(BaseProcessor):
     """Processor for Semi-Annual Reports (doc_type_code '160')."""
 
     def process(self) -> StructuredDocData | None:

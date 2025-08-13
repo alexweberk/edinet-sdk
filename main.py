@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from src.config import DAYS_BACK, DEFAULT_DOWNLOAD_DIR, SUPPORTED_DOC_TYPES
 from src.edinet.client import EdinetClient
 from src.edinet.utils import setup_logging
-from src.processors.base_processor import BaseDocumentProcessor
+from src.processors.base_processor import BaseProcessor
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ def run_demo() -> None:
     # Process the downloaded zip files into structured data
     # We pass the keys of SUPPORTED_DOC_TYPES because process_zip_directory
     # uses process_structured_data_from_raw_csv which dispatches based on these codes.
-    structured_document_data_list = BaseDocumentProcessor.process_zip_directory(
+    structured_document_data_list = BaseProcessor.process_zip_directory(
         download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
     )
 

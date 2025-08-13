@@ -70,7 +70,7 @@ The system uses a processor mapping pattern in `services.py:get_structured_docum
 - Document type codes (160, 180, etc.) map to specific processor classes
 - Each processor extracts relevant data using XBRL element IDs
 - Falls back to `GenericReportProcessor` for unsupported document types
-- All processors inherit from `BaseDocumentProcessor` and return `StructuredDocData`
+- All processors inherit from `BaseProcessor` and return `StructuredDocData`
 
 ### SDK Architecture
 
@@ -145,7 +145,7 @@ download_documents(docs)
 
 ## Adding New Document Processors
 
-1. Create class inheriting from `BaseDocumentProcessor` in `src/processors/`
+1. Create class inheriting from `BaseProcessor` in `src/processors/`
 2. Implement `process()` method with document-specific data extraction logic
 3. Add to `processor_map` in `services.py:get_structured_document_data_from_raw_csv()`
 

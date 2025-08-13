@@ -61,18 +61,18 @@ class DocMetadata(BaseModel):
 
     seqNumber: int  # noqa: N815
     docID: str  # noqa: N815
-    edinetCode: str  # noqa: N815
+    edinetCode: str | None  # noqa: N815
     secCode: str | None  # noqa: N815
     JCN: str | None
-    filerName: str  # noqa: N815
+    filerName: str | None  # noqa: N815
     fundCode: str | None  # noqa: N815
-    ordinanceCode: str  # noqa: N815
-    formCode: str  # noqa: N815
-    docTypeCode: str  # noqa: N815
+    ordinanceCode: str | None  # noqa: N815
+    formCode: str | None  # noqa: N815
+    docTypeCode: str | None  # noqa: N815
     periodStart: str | None  # noqa: N815
     periodEnd: str | None  # noqa: N815
-    submitDateTime: str  # noqa: N815
-    docDescription: str  # noqa: N815
+    submitDateTime: str | None  # noqa: N815
+    docDescription: str | None  # noqa: N815
     issuerEdinetCode: str | None  # noqa: N815
     subjectEdinetCode: str | None  # noqa: N815
     subsidiaryEdinetCode: str | None  # noqa: N815

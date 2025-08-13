@@ -1,12 +1,12 @@
 # document_processors.py
 import logging
 
-from src.processors.base_processor import BaseDocumentProcessor, StructuredDocData
+from src.processors.base_processor import BaseProcessor, StructuredDocData
 
 logger = logging.getLogger(__name__)
 
 
-class GenericReportProcessor(BaseDocumentProcessor):
+class GenericReportProcessor(BaseProcessor):
     """Processor for other document types (default)."""
 
     def process(self) -> StructuredDocData | None:
