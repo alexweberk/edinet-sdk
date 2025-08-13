@@ -136,7 +136,7 @@ def run_demo() -> None:
         if data.get("doc_id")
     }
     docs_metadata_for_processed = [
-        doc for doc in docs_metadata if doc.get("docID") in processed_doc_ids
+        doc for doc in docs_metadata if doc.docID in processed_doc_ids
     ]
 
     if not docs_metadata_for_processed:
@@ -151,14 +151,14 @@ def run_demo() -> None:
 
     # Display summary of processed documents
     for i, doc_meta in enumerate(docs_metadata_for_processed, 1):
-        doc_id = doc_meta.get("docID")
-        doc_type_code = doc_meta.get("docTypeCode")
-        company_name = doc_meta.get("filerName", "Unknown Company")
+        doc_id = doc_meta.docID
+        doc_type_code = doc_meta.docTypeCode
+        company_name = doc_meta.filerName or "Unknown Company"
         doc_type_name = SUPPORTED_DOC_TYPES.get(
             str(doc_type_code) if doc_type_code else "",
             str(doc_type_code) if doc_type_code else "Unknown",
         )
-        submit_date_time_str = doc_meta.get("submitDateTime", "Date N/A")
+        submit_date_time_str = doc_meta.submitDateTime or "Date N/A"
 
         print(f"{i}. {company_name} - {doc_type_name} (ID: {doc_id})")
         print(f"   Submitted: {submit_date_time_str}")

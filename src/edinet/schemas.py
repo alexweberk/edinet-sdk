@@ -113,7 +113,7 @@ class EdinetSuccessResponse(BaseModel):
     """Successful response structure from EDINET API."""
 
     metadata: EdinetMetadata
-    results: list[dict[str, Any]]  # List of document results
+    results: list[DocMetadata]  # List of document results
 
 
 class EdinetErrorResponse(BaseModel):

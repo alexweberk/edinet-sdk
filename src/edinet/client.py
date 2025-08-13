@@ -94,7 +94,7 @@ class EdinetClient:
         doc_type_codes: list[str] | None = None,
         excluded_doc_type_codes: list[str] | None = None,
         require_sec_code: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[DocMetadata]:
         """
         Search and filter document metadata for a single date or date range.
 
@@ -238,7 +238,7 @@ class EdinetClient:
         edinet_codes: list[str] | None = None,
         excluded_doc_type_codes: list[str] | None = None,
         require_sec_code: bool = True,
-    ) -> tuple[list[dict[str, Any]], datetime.date | None]:
+    ) -> tuple[list[DocMetadata], datetime.date | None]:
         """
         Fetch documents from the most recent day with filings within a date range.
         Searches back day by day up to `days_back`.
@@ -490,34 +490,36 @@ class EdinetClient:
 
     def _filter_documents(
         self,
-        docs: list[dict[str, Any]],
+        docs: list[DocMetadata],
         edinet_codes: list[str],
         doc_type_codes: list[str],
         excluded_doc_type_codes: list[str],
         require_sec_code: bool,
-    ) -> list[dict[str, Any]]:
+    ) -> list[DocMetadata]:
         """
         Internal method to filter documents by criteria.
         """
         filtered_list = []
         for doc in docs:
             # Validate required fields
-            if not all(key in doc for key in ["docID", "docTypeCode", "filerName"]):
+            if not all(
+                key in doc.model_dump() for key in ["docID", "docTypeCode", "filerName"]
+            ):
                 self.logger.warning("Skipping document with incomplete metadata")
                 continue
 
             # Check supported document types
-            if doc["docTypeCode"] not in SUPPORTED_DOC_TYPES:
+            if doc.docTypeCode not in SUPPORTED_DOC_TYPES:
                 continue
 
             # Apply filters
-            if edinet_codes and doc.get("edinetCode") not in edinet_codes:
+            if edinet_codes and doc.edinetCode not in edinet_codes:
                 continue
-            if doc_type_codes and doc["docTypeCode"] not in doc_type_codes:
+            if doc_type_codes and doc.docTypeCode not in doc_type_codes:
                 continue
-            if doc["docTypeCode"] in excluded_doc_type_codes:
+            if doc.docTypeCode in excluded_doc_type_codes:
                 continue
-            if require_sec_code and doc.get("secCode") is None:
+            if require_sec_code and doc.secCode is None:
                 continue
 
             filtered_list.append(doc)
