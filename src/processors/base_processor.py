@@ -42,27 +42,13 @@ def clean_text(text: str | None) -> str | None:
 
 
 class BaseProcessor:
-    """Base class for document specific data extraction."""
+    """Base class for document specific data extraction.
 
-    def __init__(
-        self,
-        raw_csv_data: list[dict[str, Any]],
-        doc_id: str,
-        doc_type_code: str,
-    ) -> None:
-        """
-        Takes bytes of a zipfile or a zip file path and converts it into structured data.
+    All methods are static/class methods as there's no need to maintain instance state.
+    Processes ZIP files or bytes data directly into structured data.
+    """
 
-        Args:
-            raw_csv_data: List of dictionaries, each containing 'filename' and 'data' (list of rows/dicts).
-            doc_id: EDINET document ID.
-            doc_type_code: EDINET document type code.
-        """
-        self.raw_csv_data = raw_csv_data
-        self.doc_id = doc_id
-        self.doc_type_code = doc_type_code
-        # Combine all rows from all CSVs for easier querying
-        self.all_records = self._combine_raw_data()
+    doc_type_code: str | None = None
 
     @staticmethod
     def read_csv_file(file_path: str) -> list[dict[str, str | None]] | None:
@@ -72,7 +58,7 @@ class BaseProcessor:
             with open(file_path, "rb") as file:
                 raw_data = file.read(CSV_ENCODING_DETECTION_BYTES)
             result = chardet.detect(raw_data)
-            detected_encoding = result["encoding"]
+            detected_encoding = result.get("encoding")
         except OSError:
             detected_encoding = None
 
@@ -174,23 +160,25 @@ class BaseProcessor:
         )
         return None
 
-    def _combine_raw_data(self) -> list[dict[str, Any]]:
+    @staticmethod
+    def _combine_raw_data(raw_csv_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Combine all rows from all CSV files into a single list."""
         combined = []
-        for csv_file in self.raw_csv_data:
+        for csv_file in raw_csv_data:
             # Add filename source to each row for debugging/context if needed
             # for row in csv_file.get('data', []):
             #     row['_source_file'] = csv_file.get('filename')
             combined.extend(csv_file.get("data", []))
         return combined
 
+    @staticmethod
     def get_value_by_id(
-        self,
+        all_records: list[dict[str, Any]],
         element_id: str,
         context_filter: str | None = None,
     ) -> str | None:
         """Helper to find a value for a specific element ID, optionally filtered by context."""
-        for record in self.all_records:
+        for record in all_records:
             if record.get("要素ID") == element_id:
                 if context_filter is None or (
                     record.get("コンテキストID")
@@ -200,16 +188,18 @@ class BaseProcessor:
                     return clean_text(value)
         return None
 
-    def get_records_by_id(self, element_id: str) -> list[dict[str, Any]]:
+    @staticmethod
+    def get_records_by_id(
+        all_records: list[dict[str, Any]], element_id: str
+    ) -> list[dict[str, Any]]:
         """Helper to find all records for a specific element ID."""
-        return [
-            record for record in self.all_records if record.get("要素ID") == element_id
-        ]
+        return [record for record in all_records if record.get("要素ID") == element_id]
 
-    def get_all_text_blocks(self) -> list[dict[str, str]]:
+    @staticmethod
+    def get_all_text_blocks(all_records: list[dict[str, Any]]) -> list[dict[str, str]]:
         """Extract all generic TextBlock elements."""
         text_blocks = []
-        for record in self.all_records:
+        for record in all_records:
             element_id = record.get("要素ID")
             value = record.get("値")
             item_name = record.get(
@@ -240,7 +230,12 @@ class BaseProcessor:
 
         return text_blocks
 
-    def process(self) -> StructuredDocData | None:
+    @staticmethod
+    def process(
+        all_records: list[dict[str, Any]],
+        doc_id: str,
+        doc_type_code: str,
+    ) -> StructuredDocData | None:
         """
         Process the raw CSV data into a structured dictionary.
         Must be implemented by subclasses.
@@ -288,8 +283,9 @@ class BaseProcessor:
             logger,
             reraise=False,
         ):
-            processor = processor_class(raw_csv_data, doc_id, doc_type_code)
-            return processor.process()
+            # Combine all records from raw CSV data
+            all_records = cls._combine_raw_data(raw_csv_data)
+            return processor_class.process(all_records, doc_id, doc_type_code)
 
     @classmethod
     def process_zip_bytes(
@@ -547,7 +543,10 @@ class BaseProcessor:
         )
         return all_structured_data
 
-    def _get_common_metadata(self) -> dict[str, Any]:
+    @staticmethod
+    def _get_common_metadata(
+        all_records: list[dict[str, Any]], doc_id: str, doc_type_code: str
+    ) -> dict[str, Any]:
         """Extract common metadata available in many filings."""
         metadata = {}
         id_to_key = {
@@ -561,12 +560,12 @@ class BaseProcessor:
             XBRL_ELEMENT_IDS["DOCUMENT_TITLE"]: "document_title",  # Common in others
         }
         for key, element_id in id_to_key.items():
-            value = self.get_value_by_id(key)
+            value = BaseProcessor.get_value_by_id(all_records, key)
             if value is not None:
                 metadata[element_id] = clean_text(value)
 
         # Add doc_id and doc_type_code from the zip filename metadata
-        metadata["doc_id"] = self.doc_id
-        metadata["doc_type_code"] = self.doc_type_code
+        metadata["doc_id"] = doc_id
+        metadata["doc_type_code"] = doc_type_code
 
         return metadata

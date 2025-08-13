@@ -66,11 +66,12 @@ This project provides a Python SDK for interacting with Japan's EDINET API v2 to
 
 ### Document Processing System
 
-The system uses a processor mapping pattern in `services.py:get_structured_document_data_from_raw_csv()`:
+The system uses a processor mapping pattern with static methods in `BaseProcessor.process_structured_data_from_raw_csv()`:
 - Document type codes (160, 180, etc.) map to specific processor classes
-- Each processor extracts relevant data using XBRL element IDs
+- Each processor uses static methods with explicit data parameters (no instance variables)
 - Falls back to `GenericReportProcessor` for unsupported document types
-- All processors inherit from `BaseProcessor` and return `StructuredDocData`
+- All processors inherit from `BaseProcessor` and implement static `process(all_records, doc_id, doc_type_code)` method
+- Processors are purely functional - they don't maintain any internal state
 
 ### SDK Architecture
 
@@ -146,8 +147,10 @@ download_documents(docs)
 ## Adding New Document Processors
 
 1. Create class inheriting from `BaseProcessor` in `src/processors/`
-2. Implement `process()` method with document-specific data extraction logic
-3. Add to `processor_map` in `services.py:get_structured_document_data_from_raw_csv()`
+2. Implement static `process(all_records, doc_id, doc_type_code)` method with document-specific data extraction logic
+3. Use static helper methods from `BaseProcessor`: `get_value_by_id()`, `get_all_text_blocks()`, `_get_common_metadata()`
+4. Add to `processor_map` in `BaseProcessor.process_structured_data_from_raw_csv()`
+5. Import the new processor class in the `process_structured_data_from_raw_csv()` method
 
 ## Project Structure
 
@@ -230,3 +233,22 @@ The project implements comprehensive error handling:
 - *Expectation*: Complex validation logic would be needed for CLI arguments
 - *Reality*: Python's argparse combined with the existing date validation in the core function provided clean separation of concerns
 - *Learning*: Validation at the service layer rather than CLI layer keeps the CLI simple and reusable
+
+## Implementation Learnings: Processor Architecture Refactoring
+
+### Key Insights from Static Method Transformation
+
+**Architectural Decision: Functional vs Object-Oriented**
+- *Problem*: Original design used instance variables (`self.raw_csv_data`, `self.doc_id`, etc.) but processors don't logically need to maintain state
+- *Solution*: Converted all methods to static methods with explicit parameter passing
+- *Learning*: Document processors are inherently functional operations - they transform input data to output structure without needing persistent state
+
+**Method Signature Evolution**
+- *Before*: `self.get_value_by_id(element_id, context_filter=None)`
+- *After*: `BaseProcessor.get_value_by_id(all_records, element_id, context_filter=None)`
+- *Benefit*: Clear data flow, better testability, no hidden dependencies on instance state
+
+**Processing Flow Simplification**
+- *Previous Flow*: Instantiate processor → Load data into instance → Call process()
+- *Current Flow*: Combine raw CSV data → Call static process(all_records, doc_id, doc_type_code)
+- *Result*: More predictable, easier to reason about, and follows functional programming principles

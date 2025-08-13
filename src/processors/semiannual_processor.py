@@ -1,5 +1,6 @@
 # document_processors.py
 import logging
+from typing import Any
 
 from src.processors.base_processor import BaseProcessor, StructuredDocData
 
@@ -9,10 +10,20 @@ logger = logging.getLogger(__name__)
 class SemiAnnualReportProcessor(BaseProcessor):
     """Processor for Semi-Annual Reports (doc_type_code '160')."""
 
-    def process(self) -> StructuredDocData | None:
+    doc_type_code = "160"
+
+    @staticmethod
+    def process(
+        all_records: list[dict[str, Any]],
+        doc_id: str,
+        doc_type_code: str,
+    ) -> StructuredDocData | None:
         """Extract key data points, tables, and text blocks for Semi-Annual Reports."""
-        logger.debug(f"Processing Semi-Annual Report (doc_id: {self.doc_id})")
-        structured_data = self._get_common_metadata()
+
+        logger.debug(f"Processing Semi-Annual Report (doc_id: {doc_id})")
+        structured_data = SemiAnnualReportProcessor._get_common_metadata(
+            all_records, doc_id, doc_type_code
+        )
 
         # --- Extract Key Financial Metrics (as key_facts) ---
         key_metrics_map = {
@@ -26,11 +37,11 @@ class SemiAnnualReportProcessor(BaseProcessor):
         }
         key_facts = {}
         for xbrl_id, fact_key in key_metrics_map.items():
-            current_value = self.get_value_by_id(
-                xbrl_id, context_filter="Current"
+            current_value = SemiAnnualReportProcessor.get_value_by_id(
+                all_records, xbrl_id, context_filter="Current"
             )  # Look for Current* contexts
-            prior_value = self.get_value_by_id(
-                xbrl_id, context_filter="Prior"
+            prior_value = SemiAnnualReportProcessor.get_value_by_id(
+                all_records, xbrl_id, context_filter="Prior"
             )  # Look for Prior* contexts
 
             if current_value is not None or prior_value is not None:
@@ -50,7 +61,9 @@ class SemiAnnualReportProcessor(BaseProcessor):
         structured_data["financial_tables"] = []
         for xbrl_id, table_title_en in financial_tables_map.items():
             # Find the specific text block containing the table data (often rendered as text)
-            table_text_block = self.get_value_by_id(xbrl_id)
+            table_text_block = SemiAnnualReportProcessor.get_value_by_id(
+                all_records, xbrl_id
+            )
             if table_text_block:
                 structured_data["financial_tables"].append(
                     {"title_en": table_title_en, "raw_text_content": table_text_block}
@@ -75,7 +88,9 @@ class SemiAnnualReportProcessor(BaseProcessor):
         ]
         structured_data["text_blocks"] = []
         for xbrl_id, title_en in text_block_elements:
-            content = self.get_value_by_id(xbrl_id)  # Get the raw text content
+            content = SemiAnnualReportProcessor.get_value_by_id(
+                all_records, xbrl_id
+            )  # Get the raw text content
             if content:
                 structured_data["text_blocks"].append(
                     {
@@ -87,11 +102,13 @@ class SemiAnnualReportProcessor(BaseProcessor):
         # Fallback to include all text blocks if specific ones aren't found (less structured)
         if not structured_data["text_blocks"]:
             logger.warning(
-                f"Specific text blocks not found for {self.doc_id}, including all text blocks."
+                f"Specific text blocks not found for {doc_id}, including all text blocks."
             )
-            structured_data["text_blocks"] = self.get_all_text_blocks()
+            structured_data["text_blocks"] = (
+                SemiAnnualReportProcessor.get_all_text_blocks(all_records)
+            )
 
         logger.debug(
-            f"Finished processing Semi-Annual Report {self.doc_id}. Extracted {len(key_facts)} key facts, {len(structured_data['financial_tables'])} financial tables, and {len(structured_data['text_blocks'])} text blocks."
+            f"Finished processing Semi-Annual Report {doc_id}. Extracted {len(key_facts)} key facts, {len(structured_data['financial_tables'])} financial tables, and {len(structured_data['text_blocks'])} text blocks."
         )
         return structured_data if structured_data else None
