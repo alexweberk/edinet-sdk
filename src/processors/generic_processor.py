@@ -1,7 +1,7 @@
 # document_processors.py
 import logging
 
-from src.processors.base_processor import BaseDocumentProcessor, StructuredDocumentData
+from src.processors.base_processor import BaseDocumentProcessor, StructuredDocData
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class GenericReportProcessor(BaseDocumentProcessor):
     """Processor for other document types (default)."""
 
-    def process(self) -> StructuredDocumentData | None:
+    def process(self) -> StructuredDocData | None:
         """Extract common metadata and all text blocks for generic reports."""
         logger.debug(
             f"Processing Generic Report (doc_id: {self.doc_id}, type: {self.doc_type_code})"

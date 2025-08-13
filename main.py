@@ -2,13 +2,16 @@ import argparse
 import json
 import logging
 import sys
+from datetime import datetime, timedelta
 
 from src.config import DAYS_BACK, DEFAULT_DOWNLOAD_DIR, SUPPORTED_DOC_TYPES
 from src.edinet.client import EdinetClient
 from src.edinet.utils import setup_logging
+from src.processors.base_processor import BaseDocumentProcessor
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
 
 def parse_args():
     """Parse command line arguments."""
@@ -56,7 +59,7 @@ def run_company_date_range_query(args):
         structured_data = edinet_client.get_structured_data_for_company_date_range(
             edinet_code=args.edinet_code,
             start_date=args.start_date,
-            end_date=args.end_date
+            end_date=args.end_date,
         )
 
         # Convert to JSON
@@ -102,9 +105,10 @@ def run_demo() -> None:
     edinet_client = EdinetClient()
 
     # Fetch the most recent documents of the specified types
-    docs_metadata, found_date = edinet_client.get_most_recent_documents(
-        doc_type_codes_to_fetch,
-        days_back=days_back,
+    docs_metadata = edinet_client.list_docs(
+        start_date=datetime.now() - timedelta(days=days_back),
+        end_date=datetime.now(),
+        doc_type_codes=doc_type_codes_to_fetch,
     )
 
     if not docs_metadata:
@@ -118,12 +122,10 @@ def run_demo() -> None:
     # download_documents function handles creating the directory
     edinet_client.download_documents(docs_metadata, download_dir)
 
-    logger.info(f"\nProcessing downloaded documents from {found_date}...")
-
     # Process the downloaded zip files into structured data
-    # We pass the keys of SUPPORTED_DOC_TYPES because get_structured_data_from_zip_directory
-    # uses process_raw_csv_data which dispatches based on these codes.
-    structured_document_data_list = edinet_client.get_structured_data_from_zip_directory(
+    # We pass the keys of SUPPORTED_DOC_TYPES because process_zip_directory
+    # uses process_structured_data_from_raw_csv which dispatches based on these codes.
+    structured_document_data_list = BaseDocumentProcessor.process_zip_directory(
         download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
     )
 
@@ -162,7 +164,9 @@ def run_demo() -> None:
         print(f"   Submitted: {submit_date_time_str}")
 
     print(f"\n{'=' * 80}")
-    logger.info(f"Demo run complete. Successfully processed {len(docs_metadata_for_processed)} documents.")
+    logger.info(
+        f"Demo run complete. Successfully processed {len(docs_metadata_for_processed)} documents."
+    )
 
 
 if __name__ == "__main__":

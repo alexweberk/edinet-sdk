@@ -32,6 +32,20 @@ uv run ruff check .      # Linting
 uv run ruff format .     # Formatting
 ```
 
+## TODO
+- Add logic to handle document types and use the correct processor to return structured data
+
+```python
+client = EdinetClient()
+
+docs_list = client.list_docs(edinet_code=12345, start_date='2024-05-01', end_date='2025-04-30')
+client.download(docs_list)
+
+# OR
+docs_list: list[DocsMeta] = client.list_docs(edinet_code=12345, start_date='2024-05-01', end_date='2025-04-30')
+docs: list[Doc] = client.get_docs(docs_list)
+```
+
 
 ## Disclaimer
 

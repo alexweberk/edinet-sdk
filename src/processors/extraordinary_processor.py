@@ -1,7 +1,7 @@
 import logging
 
 from src.config import EXTRAORDINARY_REPORT_ELEMENT_IDS
-from src.processors.base_processor import BaseDocumentProcessor, StructuredDocumentData
+from src.processors.base_processor import BaseDocumentProcessor, StructuredDocData
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class ExtraordinaryReportProcessor(BaseDocumentProcessor):
     """Processor for Extraordinary Reports (doc_type_code '180')."""
 
-    def process(self) -> StructuredDocumentData | None:
+    def process(self) -> StructuredDocData | None:
         """Extract key data points and text blocks for Extraordinary Reports."""
         logger.debug(f"Processing Extraordinary Report (doc_id: {self.doc_id})")
         structured_data = self._get_common_metadata()

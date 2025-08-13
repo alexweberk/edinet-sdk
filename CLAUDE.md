@@ -70,7 +70,7 @@ The system uses a processor mapping pattern in `services.py:get_structured_docum
 - Document type codes (160, 180, etc.) map to specific processor classes
 - Each processor extracts relevant data using XBRL element IDs
 - Falls back to `GenericReportProcessor` for unsupported document types
-- All processors inherit from `BaseDocumentProcessor` and return `StructuredDocumentData`
+- All processors inherit from `BaseDocumentProcessor` and return `StructuredDocData`
 
 ### SDK Architecture
 

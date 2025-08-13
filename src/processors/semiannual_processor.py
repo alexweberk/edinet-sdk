@@ -1,7 +1,7 @@
 # document_processors.py
 import logging
 
-from src.processors.base_processor import BaseDocumentProcessor, StructuredDocumentData
+from src.processors.base_processor import BaseDocumentProcessor, StructuredDocData
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class SemiAnnualReportProcessor(BaseDocumentProcessor):
     """Processor for Semi-Annual Reports (doc_type_code '160')."""
 
-    def process(self) -> StructuredDocumentData | None:
+    def process(self) -> StructuredDocData | None:
         """Extract key data points, tables, and text blocks for Semi-Annual Reports."""
         logger.debug(f"Processing Semi-Annual Report (doc_id: {self.doc_id})")
         structured_data = self._get_common_metadata()
