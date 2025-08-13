@@ -15,8 +15,8 @@ class GenericReportProcessor(BaseProcessor):
     @staticmethod
     def process(
         all_records: list[dict[str, Any]],
-        doc_id: str,
-        doc_type_code: str,
+        doc_id: str | None = None,
+        doc_type_code: str | None = None,
     ) -> StructuredDocData | None:
         """Extract common metadata and all text blocks for generic reports."""
 
@@ -24,7 +24,9 @@ class GenericReportProcessor(BaseProcessor):
             f"Processing Generic Report (doc_id: {doc_id}, type: {doc_type_code})"
         )
         structured_data = GenericReportProcessor._get_common_metadata(
-            all_records, doc_id, doc_type_code
+            all_records,
+            doc_id,
+            doc_type_code,
         )
         structured_data[
             "key_facts"

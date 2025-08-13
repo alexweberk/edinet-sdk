@@ -17,6 +17,7 @@
     "ONELINER",
     "resultset",
     "retryable",
+    "undecoded",
     "xbrl"
   ],
   "ignoreWords": [],

@@ -15,8 +15,8 @@ class ExtraordinaryReportProcessor(BaseProcessor):
     @staticmethod
     def process(
         all_records: list[dict[str, Any]],
-        doc_id: str,
-        doc_type_code: str,
+        doc_id: str | None = None,
+        doc_type_code: str | None = None,
     ) -> StructuredDocData | None:
         """Extract key data points and text blocks for Extraordinary Reports."""
 

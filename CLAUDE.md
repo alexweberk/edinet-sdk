@@ -205,6 +205,10 @@ The project implements comprehensive error handling:
 - Extracts CSV files, skips auditor reports (jpaud* files)
 - Dispatches to appropriate processor based on document type code
 
+## Python Coding Conventions
+- Use Python 3.12>= style type hinting. For example, use `str | None` instead of `Optional[str]`.
+- Always position public methods at the top of the file and private methods at the bottom.
+
 ## Implementation Learnings: Company Date Range Query Feature
 
 ### Key Insights from Issue #2 Implementation
