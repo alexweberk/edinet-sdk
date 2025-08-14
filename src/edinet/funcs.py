@@ -47,6 +47,7 @@ def filter_filings(
             or any(
                 value in getattr(filing, snake_to_camel(filter_name))
                 for value in filter_values
+                if getattr(filing, snake_to_camel(filter_name)) is not None
             )
             for filter_name, filter_values in filters.items()
         )

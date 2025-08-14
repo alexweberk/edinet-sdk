@@ -95,6 +95,7 @@ class EdinetClient:
         filing_type_codes: list[str] | None = None,
         excluded_filing_type_codes: list[str] | None = None,
         require_sec_code: bool = False,
+        filer_names: list[str] | None = None,
     ) -> list[FilingMetadata]:
         """
         Get recent filings metadata for the last N days.
@@ -105,6 +106,7 @@ class EdinetClient:
             filing_type_codes: List of document type codes to filter by.
             excluded_filing_type_codes: List of document type codes to exclude.
             require_sec_code: Whether to require a security code.
+            filer_names: List of filer names to filter by.
 
         Returns:
             List of document metadata that match the criteria from the last N days.
@@ -119,6 +121,7 @@ class EdinetClient:
             filing_type_codes=filing_type_codes,
             excluded_filing_type_codes=excluded_filing_type_codes,
             require_sec_code=require_sec_code,
+            filer_names=filer_names,
         )
 
     @handle_api_errors
@@ -130,6 +133,7 @@ class EdinetClient:
         filing_type_codes: list[str] | None = None,
         excluded_filing_type_codes: list[str] | None = None,
         require_sec_code: bool = False,
+        filer_names: list[str] | None = None,
     ) -> list[FilingMetadata]:
         """
         Search and filter document metadata for a single date or date range.
@@ -141,6 +145,7 @@ class EdinetClient:
             filing_type_codes: List of document type codes to filter by.
             excluded_filing_type_codes: List of document type codes to exclude.
             require_sec_code: Whether to require a security code.
+            filer_names: List of filer names to filter by.
 
         Returns:
             List of document metadata dictionaries that match the criteria.
@@ -190,6 +195,7 @@ class EdinetClient:
                         docs_to_filter,
                         edinet_codes=edinet_codes,
                         doc_type_codes=filing_type_codes,
+                        filer_names=filer_names,
                     )
 
                     matching_docs.extend(filtered_docs)

@@ -37,12 +37,8 @@ if __name__ == "__main__":
 
     all_filings = edinet_client.list_recent_filings(
         lookback_days=args.lookback_days,
-    )
-
-    target_filings = edinet_client.filter_filings(
-        all_filings,
         filer_names=[args.company_name],
     )
 
     print("Here are the target filings:")
-    print(target_filings)
+    print(all_filings)
