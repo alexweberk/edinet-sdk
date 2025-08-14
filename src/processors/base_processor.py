@@ -14,7 +14,7 @@ from src.config import (
     MACOS_METADATA_DIR,
     TEXT_REPLACEMENTS,
 )
-from src.processors.schemas import CsvFileAsRecords, FilenameRecords
+from src.models import CsvFileAsRecords, File, Filing, FilingMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -37,16 +37,17 @@ def clean_text(text: str | None) -> str | None:
 
 
 class BaseProcessor:
-    """Base class for document specific data extraction.
+    """
+    Base class for document specific data extraction.
 
     All methods are static/class methods as there's no need to maintain instance state.
     Processes ZIP files or bytes data directly into structured data.
 
-    zip_bytes_to_filename_records: zip bytes -> FilenameRecords
-    zip_file_to_filename_records: zip file -> FilenameRecords
-    zip_directory_to_filename_records: zip directory -> FilenameRecords
+    zip_bytes_to_filename_records: zip bytes -> Filing
+    zip_file_to_filename_records: zip file -> Filing
+    zip_directory_to_filename_records: zip directory -> Filing
 
-    process: FilenameRecords -> StructuredDocData
+    process: Filing -> StructuredDocData
     """
 
     COMMON_ENCODINGS = [
@@ -59,26 +60,28 @@ class BaseProcessor:
         "iso-8859-1",
         "windows-1252",
     ]
+
+    # The doc_type_code this processor is designed for
     doc_type_code: str | None = None
 
     @classmethod
-    def zip_bytes_to_filename_records(
+    def zip_bytes_to_filing(
         cls,
         zip_bytes: bytes,
-        doc_id: str | None = None,
-    ) -> FilenameRecords | None:
+        filing_metadata: FilingMetadata,
+    ) -> Filing | None:
         """
         Extract CSVs from ZIP bytes in memory and return as list of records.
 
         Args:
             zip_bytes: The ZIP file content as bytes.
-            doc_id: EDINET document ID. Optional.
-            doc_type_code: EDINET document type code. Optional.
+            filing_metadata: The metadata of the filing.
 
         Returns:
             List of records, or None if processing failed.
         """
-        filename_records: FilenameRecords = {}
+        doc_id = filing_metadata.docID
+        files: list[File] = []
 
         try:
             # Create a BytesIO object from the zip bytes
@@ -104,9 +107,10 @@ class BaseProcessor:
                         basename,
                     )
                     if records is not None:
-                        filename_records[basename] = records
+                        file = File(filename=basename, records=records)
+                        files.append(file)
 
-                return filename_records if filename_records else None
+                return Filing(metadata=filing_metadata, files=files)
 
         except Exception as e:
             logger.error(f"Critical error processing ZIP bytes for doc {doc_id}: {e}")
@@ -161,38 +165,41 @@ class BaseProcessor:
         return df.to_dict(orient="records")
 
     @classmethod
-    def zip_file_to_filename_records(
+    def zip_file_to_filing(
         cls,
         zip_file_path: str,
-    ) -> FilenameRecords | None:
+        filing_metadata: FilingMetadata,
+    ) -> Filing | None:
         """Read a zipfile and return a dictionary of filename to records."""
         try:
             with open(zip_file_path, "rb") as f:
                 zip_bytes = f.read()
 
-            # Extract doc_id from filename if possible (optional parameter)
-            doc_id = os.path.splitext(os.path.basename(zip_file_path))[0]
-
-            return cls.zip_bytes_to_filename_records(zip_bytes, doc_id)
+            return cls.zip_bytes_to_filing(
+                zip_bytes=zip_bytes,
+                filing_metadata=filing_metadata,
+            )
 
         except Exception as e:
             logger.error(f"Error reading ZIP file {zip_file_path}: {e}")
             return None
 
     @classmethod
-    def zip_directory_to_filename_records(
+    def zip_directory_to_filings(
         cls,
         zip_directory_path: str,
-    ) -> FilenameRecords | None:
+        filing_metadata: FilingMetadata,
+    ) -> list[Filing] | None:
         """Read zip files from a directory and return a dictionary of filename to records."""
-        all_filename_records: FilenameRecords = {}
+        all_filings: list[Filing] = []
         for zip_file_path in os.listdir(zip_directory_path):
-            filename_records = cls.zip_file_to_filename_records(
-                os.path.join(zip_directory_path, zip_file_path)
+            filing = cls.zip_file_to_filing(
+                zip_file_path=os.path.join(zip_directory_path, zip_file_path),
+                filing_metadata=filing_metadata,
             )
-            if filename_records:
-                all_filename_records.update(filename_records)
-        return all_filename_records if all_filename_records else None
+            if filing:
+                all_filings.append(filing)
+        return all_filings if all_filings else None
 
     @staticmethod
     def _filter_csv_files(file_list: list[str]) -> list[str]:

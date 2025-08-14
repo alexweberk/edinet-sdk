@@ -46,6 +46,9 @@ docs_list: list[DocsMeta] = client.list_docs(edinet_code=12345, start_date='2024
 docs: list[Doc] = client.get_docs(docs_list)
 ```
 
+- Rename Doc to Filing and DocMetadata to FilingMetadata
+- Rename File to Doc
+
 
 ## Disclaimer
 

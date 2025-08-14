@@ -22,17 +22,19 @@ from src.config import (
     MAX_RETRIES,
     SUPPORTED_DOC_TYPES,
 )
-from src.edinet.schemas import (
-    DocMetadata,
+from src.edinet.utils import handle_api_errors
+from src.models import (
     EdinetAuthenticationError,
     EdinetConnectionError,
     EdinetDocumentFetchError,
     EdinetErrorResponse,
     EdinetRetryExceededError,
     EdinetSuccessResponse,
+    Filing,
+    FilingMetadata,
     ValidationError,
 )
-from src.edinet.utils import handle_api_errors
+from src.processors.base_processor import BaseProcessor
 
 # Use module-specific logger
 logger = logging.getLogger(__name__)
@@ -94,7 +96,7 @@ class EdinetClient:
         doc_type_codes: list[str] | None = None,
         excluded_doc_type_codes: list[str] | None = None,
         require_sec_code: bool = False,
-    ) -> list[DocMetadata]:
+    ) -> list[FilingMetadata]:
         """
         Search and filter document metadata for a single date or date range.
 
@@ -159,55 +161,76 @@ class EdinetClient:
         return matching_docs
 
     @handle_api_errors
-    def get_doc(self, doc_id: str) -> bytes:
+    def get_filing(self, filing_metadata: FilingMetadata) -> Filing | None:
         """
         Download a single document by ID and return raw bytes.
 
         Args:
-            doc_id: The ID of the document to download.
+            filing_metadata: The metadata of the document to download.
 
         Returns:
-            The raw bytes of the document.
+            A Filing object, which has the metadata and the files from the zip file,
+            or None if the document does not exist.
 
         Raises:
             EdinetDocumentFetchError: If document download fails.
         """
+        try:
+            zip_bytes = self.get_zip_bytes(filing_metadata)
+            filing = BaseProcessor.zip_bytes_to_filing(
+                zip_bytes=zip_bytes,
+                filing_metadata=filing_metadata,
+            )
+            return filing
+
+        except (EdinetConnectionError, EdinetRetryExceededError) as e:
+            raise EdinetDocumentFetchError(str(e)) from e
+
+    @handle_api_errors
+    def get_zip_bytes(self, filing_metadata: FilingMetadata) -> bytes:
+        """
+        Download a single document by ID and return raw bytes.
+        """
+        doc_id = filing_metadata.docID
         url = f"{EDINET_DOCUMENT_API_BASE_URL}/documents/{doc_id}"
         params = {
             "type": API_CSV_DOCUMENT_TYPE,
             "Subscription-Key": self.api_key,
         }
 
-        operation_name = f"download document {doc_id}"
-        try:
-            return self._make_request_with_retry(
-                url, params, operation_name, return_content=True
-            )
-        except (EdinetConnectionError, EdinetRetryExceededError) as e:
-            raise EdinetDocumentFetchError(str(e)) from e
+        operation_name = f"get zip bytes for {doc_id}"
+        zip_bytes = self._make_request_with_retry(
+            url,
+            params,
+            operation_name,
+            return_content=True,
+        )
+        if not zip_bytes:
+            raise EdinetDocumentFetchError(f"Failed to fetch zip bytes for {doc_id}.")
+        return zip_bytes
 
     def download_documents(
         self,
-        docs: list[DocMetadata],
+        filing_metadatas: list[FilingMetadata],
         download_dir: str | None = None,
     ) -> None:
         """
         Download all documents in the provided list.
 
         Args:
-            docs: List of document dictionaries to download.
+            filing_metadatas: The metadata of the documents to download.
             download_dir: Directory to save documents. If None, uses instance default.
         """
         target_dir = download_dir or self.download_dir
         Path(target_dir).mkdir(parents=True, exist_ok=True)
 
-        total_docs = len(docs)
+        total_docs = len(filing_metadatas)
         self.logger.info(f"Downloading {total_docs} documents to {target_dir}")
 
-        for i, doc in enumerate(docs, 1):
-            doc_id = doc.docID
-            doc_type_code = doc.docTypeCode
-            filer = doc.filerName
+        for i, filing_metadata in enumerate(filing_metadatas, 1):
+            doc_id = filing_metadata.docID
+            doc_type_code = filing_metadata.docTypeCode
+            filer = filing_metadata.filerName
 
             if not all([doc_id, doc_type_code, filer]):
                 self.logger.warning(
@@ -224,8 +247,8 @@ class EdinetClient:
             self.logger.info(f"Downloading {i}/{total_docs}: {filename}")
 
             try:
-                doc_content = self.get_doc(doc_id)
-                self.save_bytes(filepath, doc_content)
+                zip_bytes = self.get_zip_bytes(filing_metadata)
+                self.save_bytes(zip_bytes, filepath)
             except Exception as e:
                 self.logger.error(f"Failed to download {filename}: {e}")
 
@@ -238,7 +261,7 @@ class EdinetClient:
         edinet_codes: list[str] | None = None,
         excluded_doc_type_codes: list[str] | None = None,
         require_sec_code: bool = True,
-    ) -> tuple[list[DocMetadata], datetime.date | None]:
+    ) -> tuple[list[FilingMetadata], datetime.date | None]:
         """
         Fetch documents from the most recent day with filings within a date range.
         Searches back day by day up to `days_back`.
@@ -302,149 +325,149 @@ class EdinetClient:
         )
         return [], None
 
-    def get_structured_data_directly_from_api(
-        self,
-        doc_id: str,
-        doc_type_code: str,
-    ) -> dict[str, Any] | None:
-        """
-        Fetch a document from the API and process it directly in memory without saving temporary files.
+    # def get_structured_data_directly_from_api(
+    #     self,
+    #     doc_id: str,
+    #     doc_type_code: str,
+    # ) -> dict[str, Any] | None:
+    #     """
+    #     Fetch a document from the API and process it directly in memory without saving temporary files.
 
-        Args:
-            doc_id: EDINET document ID.
-            doc_type_code: EDINET document type code.
+    #     Args:
+    #         doc_id: EDINET document ID.
+    #         doc_type_code: EDINET document type code.
 
-        Returns:
-            Structured dictionary of the document's data, or None if processing failed.
-        """
-        from src.processors.base_processor import BaseProcessor
+    #     Returns:
+    #         Structured dictionary of the document's data, or None if processing failed.
+    #     """
+    #     from src.processors.base_processor import BaseProcessor
 
-        try:
-            # Fetch document bytes from API
-            doc_bytes = self.get_doc(doc_id)
+    #     try:
+    #         # Fetch document bytes from API
+    #         doc_bytes = self.get_doc(doc_id)
 
-            # Process directly in memory
-            return BaseProcessor.process_zip_bytes(doc_bytes, doc_id, doc_type_code)
+    #         # Process directly in memory
+    #         return BaseProcessor.zip_bytes_to_filename_records(doc_bytes, doc_id)
 
-        except Exception as e:
-            self.logger.error(f"Error fetching and processing document {doc_id}: {e}")
-            return None
+    #     except Exception as e:
+    #         self.logger.error(f"Error fetching and processing document {doc_id}: {e}")
+    #         return None
 
-    def get_structured_data_for_company_date_range(
-        self,
-        edinet_code: str,
-        start_date: datetime.date | str,
-        end_date: datetime.date | str,
-        doc_type_codes: list[str] | None = None,
-        excluded_doc_type_codes: list[str] | None = None,
-        require_sec_code: bool = True,
-        download_dir: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Return structured data for filings by one company within a date range.
+    # def get_structured_data_for_company_date_range(
+    #     self,
+    #     edinet_code: str,
+    #     start_date: datetime.date | str,
+    #     end_date: datetime.date | str,
+    #     doc_type_codes: list[str] | None = None,
+    #     excluded_doc_type_codes: list[str] | None = None,
+    #     require_sec_code: bool = True,
+    #     download_dir: str | None = None,
+    # ) -> list[dict[str, Any]]:
+    #     """Return structured data for filings by one company within a date range.
 
-        Validates dates (YYYY-MM-DD if str), ensures start_date <= end_date,
-        fetches documents via list_docs filtered by the given edinet_code,
-        downloads ZIPs to a target directory (create a subdir if download_dir is None),
-        and converts ZIPs to structured dicts using BaseProcessor.process_zip_directory.
+    #     Validates dates (YYYY-MM-DD if str), ensures start_date <= end_date,
+    #     fetches documents via list_docs filtered by the given edinet_code,
+    #     downloads ZIPs to a target directory (create a subdir if download_dir is None),
+    #     and converts ZIPs to structured dicts using BaseProcessor.process_zip_directory.
 
-        Args:
-            edinet_code: EDINET code for the company to fetch documents for
-            start_date: Start date for the date range (datetime.date or YYYY-MM-DD string)
-            end_date: End date for the date range (datetime.date or YYYY-MM-DD string)
-            doc_type_codes: Optional list of document type codes to include
-            excluded_doc_type_codes: Optional list of document type codes to exclude
-            require_sec_code: Whether to require a security code (default: True)
-            download_dir: Directory to download files to (auto-generated if None)
+    #     Args:
+    #         edinet_code: EDINET code for the company to fetch documents for
+    #         start_date: Start date for the date range (datetime.date or YYYY-MM-DD string)
+    #         end_date: End date for the date range (datetime.date or YYYY-MM-DD string)
+    #         doc_type_codes: Optional list of document type codes to include
+    #         excluded_doc_type_codes: Optional list of document type codes to exclude
+    #         require_sec_code: Whether to require a security code (default: True)
+    #         download_dir: Directory to download files to (auto-generated if None)
 
-        Returns:
-            List of structured dictionaries (one per processed document).
-        """
-        from src.processors.base_processor import BaseProcessor
+    #     Returns:
+    #         List of structured dictionaries (one per processed document).
+    #     """
+    #     from src.processors.base_processor import BaseProcessor
 
-        # Parse and validate dates
-        if isinstance(start_date, str):
-            try:
-                start_date_parsed = datetime.datetime.strptime(
-                    start_date, "%Y-%m-%d"
-                ).date()
-            except ValueError as e:
-                raise ValueError(
-                    f"Invalid start_date format. Use 'YYYY-MM-DD'. Got: {start_date}"
-                ) from e
-        else:
-            start_date_parsed = start_date
+    #     # Parse and validate dates
+    #     if isinstance(start_date, str):
+    #         try:
+    #             start_date_parsed = datetime.datetime.strptime(
+    #                 start_date, "%Y-%m-%d"
+    #             ).date()
+    #         except ValueError as e:
+    #             raise ValueError(
+    #                 f"Invalid start_date format. Use 'YYYY-MM-DD'. Got: {start_date}"
+    #             ) from e
+    #     else:
+    #         start_date_parsed = start_date
 
-        if isinstance(end_date, str):
-            try:
-                end_date_parsed = datetime.datetime.strptime(
-                    end_date, "%Y-%m-%d"
-                ).date()
-            except ValueError as e:
-                raise ValueError(
-                    f"Invalid end_date format. Use 'YYYY-MM-DD'. Got: {end_date}"
-                ) from e
-        else:
-            end_date_parsed = end_date
+    #     if isinstance(end_date, str):
+    #         try:
+    #             end_date_parsed = datetime.datetime.strptime(
+    #                 end_date, "%Y-%m-%d"
+    #             ).date()
+    #         except ValueError as e:
+    #             raise ValueError(
+    #                 f"Invalid end_date format. Use 'YYYY-MM-DD'. Got: {end_date}"
+    #             ) from e
+    #     else:
+    #         end_date_parsed = end_date
 
-        # Validate date range
-        if start_date_parsed > end_date_parsed:
-            raise ValueError(
-                f"start_date ({start_date_parsed}) must be <= end_date ({end_date_parsed})"
-            )
+    #     # Validate date range
+    #     if start_date_parsed > end_date_parsed:
+    #         raise ValueError(
+    #             f"start_date ({start_date_parsed}) must be <= end_date ({end_date_parsed})"
+    #         )
 
-        self.logger.info(
-            f"Fetching documents for EDINET code {edinet_code} from {start_date_parsed} to {end_date_parsed}"
-        )
+    #     self.logger.info(
+    #         f"Fetching documents for EDINET code {edinet_code} from {start_date_parsed} to {end_date_parsed}"
+    #     )
 
-        # Create download directory if not provided
-        if download_dir is None:
-            download_dir = (
-                f"downloads/company-{edinet_code}-{start_date_parsed}_{end_date_parsed}"
-            )
+    #     # Create download directory if not provided
+    #     if download_dir is None:
+    #         download_dir = (
+    #             f"downloads/company-{edinet_code}-{start_date_parsed}_{end_date_parsed}"
+    #         )
 
-        os.makedirs(download_dir, exist_ok=True)
-        self.logger.info(f"Using download directory: {download_dir}")
+    #     os.makedirs(download_dir, exist_ok=True)
+    #     self.logger.info(f"Using download directory: {download_dir}")
 
-        # Fetch documents for the company within the date range
-        docs_metadata = self.list_docs(
-            start_date=start_date_parsed,
-            end_date=end_date_parsed,
-            edinet_codes=[edinet_code],  # Filter by single EDINET code
-            doc_type_codes=doc_type_codes,
-            excluded_doc_type_codes=excluded_doc_type_codes,
-            require_sec_code=require_sec_code,
-        )
+    #     # Fetch documents for the company within the date range
+    #     docs_metadata = self.list_docs(
+    #         start_date=start_date_parsed,
+    #         end_date=end_date_parsed,
+    #         edinet_codes=[edinet_code],  # Filter by single EDINET code
+    #         doc_type_codes=doc_type_codes,
+    #         excluded_doc_type_codes=excluded_doc_type_codes,
+    #         require_sec_code=require_sec_code,
+    #     )
 
-        if not docs_metadata:
-            self.logger.info(
-                f"No documents found for EDINET code {edinet_code} in the specified date range"
-            )
-            return []
+    #     if not docs_metadata:
+    #         self.logger.info(
+    #             f"No documents found for EDINET code {edinet_code} in the specified date range"
+    #         )
+    #         return []
 
-        self.logger.info(f"Found {len(docs_metadata)} documents for {edinet_code}")
+    #     self.logger.info(f"Found {len(docs_metadata)} documents for {edinet_code}")
 
-        # Download the documents
-        self.download_documents(docs_metadata, download_dir)
+    #     # Download the documents
+    #     self.download_documents(docs_metadata, download_dir)
 
-        # Process the downloaded zip files into structured data
-        # Use all supported document types for processing
-        structured_document_data_list = BaseProcessor.process_zip_directory(
-            download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
-        )
+    #     # Process the downloaded zip files into structured data
+    #     # Use all supported document types for processing
+    #     structured_document_data_list = BaseProcessor.process_zip_directory(
+    #         download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
+    #     )
 
-        self.logger.info(
-            f"Successfully processed {len(structured_document_data_list)} documents for {edinet_code}"
-        )
+    #     self.logger.info(
+    #         f"Successfully processed {len(structured_document_data_list)} documents for {edinet_code}"
+    #     )
 
-        return structured_document_data_list
+    #     return structured_document_data_list
 
-    def save_bytes(self, filepath: str, data: bytes) -> None:
+    def save_bytes(self, data: bytes, filepath: str) -> None:
         """
         Save bytes data to a file with error handling.
 
         Args:
-            filepath: Path where the file should be saved.
             data: Raw bytes data to save.
+            filepath: Path where the file should be saved.
 
         Raises:
             OSError: If file writing fails.
@@ -488,12 +511,12 @@ class EdinetClient:
 
     def _filter_documents(
         self,
-        docs: list[DocMetadata],
+        docs: list[FilingMetadata],
         edinet_codes: list[str],
         doc_type_codes: list[str],
         excluded_doc_type_codes: list[str],
         require_sec_code: bool,
-    ) -> list[DocMetadata]:
+    ) -> list[FilingMetadata]:
         """
         Internal method to filter documents by criteria.
         """

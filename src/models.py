@@ -1,10 +1,32 @@
 """EDINET API schemas and exception classes."""
 
+import logging
+from collections.abc import Hashable
 from typing import Any
 
 from pydantic import BaseModel
 
-from src.models import CsvFileAsRecords
+StructuredDocData = dict[str, Any]
+
+# Example record:
+# {
+#     "要素ID": "jppfs_cor:SalariesAndAllowancesSGA",
+#     "項目名": "給料及び手当、販売費及び一般管理費",
+#     "コンテキストID": "CurrentYTDDuration",
+#     "相対年度": "当四半期累計期間",
+#     "連結・個別": "連結",
+#     "期間・時点": "期間",
+#     "ユニットID": "JPY",
+#     "単位": "円",
+#     "値": "1044176000",
+# }
+Record = dict[Hashable, Any]
+CsvFileAsRecords = list[Record]
+
+# TODO: Remove FilenameRecords and replace with Filing
+# Instead of having a FilenameRecord which lacks the metadata for the filing,
+# We will define methods in terms of the Filing class.
+FilenameRecords = dict[str, CsvFileAsRecords]
 
 
 class File(BaseModel):
@@ -57,7 +79,7 @@ class Filing(BaseModel):
     A filing is a zip file that could contain multiple files.
     """
 
-    meta: FilingMetadata
+    metadata: FilingMetadata
     files: list[File]
 
     def get_filenames(self) -> list[str]:
@@ -70,6 +92,9 @@ class Filing(BaseModel):
             if file.filename == filename:
                 return file.records
         raise ValueError(f"File {filename} not found in filing.")
+
+
+# Response models
 
 
 # TypedDict definitions based on actual API responses
@@ -103,3 +128,77 @@ class EdinetErrorResponse(BaseModel):
 
 # Type alias for any EDINET API response
 EdinetResponse = EdinetSuccessResponse | EdinetErrorResponse
+
+
+# Exception classes
+
+
+class EdinetAPIError(Exception):
+    """Base exception for EDINET API related errors."""
+
+    pass
+
+
+class EdinetAuthenticationError(EdinetAPIError):
+    """Raised when authentication to EDINET API fails."""
+
+    pass
+
+
+class EdinetConnectionError(EdinetAPIError):
+    """Raised when connection to EDINET API fails."""
+
+    pass
+
+
+class EdinetDocumentFetchError(EdinetAPIError):
+    """Raised when document fetching from EDINET API fails."""
+
+    pass
+
+
+class EdinetRetryExceededError(EdinetAPIError):
+    """Raised when maximum retry attempts are exceeded."""
+
+    pass
+
+
+class ValidationError(Exception):
+    """Raised when data validation fails."""
+
+    pass
+
+
+# Simplified error handling utilities
+
+
+class ErrorContext:
+    """Context manager for consistent error handling."""
+
+    def __init__(
+        self,
+        operation_name: str,
+        logger_instance: logging.Logger,
+        reraise: bool = True,
+    ):
+        self.operation_name = operation_name
+        self.logger = logger_instance
+        self.reraise = reraise
+
+    def __enter__(self):
+        self.logger.debug(f"Starting operation: {self.operation_name}")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.logger.error(
+                f"Operation '{self.operation_name}' failed: {exc_val}",
+                exc_info=(exc_type, exc_val, exc_tb),
+            )
+            if not self.reraise:
+                return True  # Suppress exception
+        else:
+            self.logger.debug(
+                f"Operation completed successfully: {self.operation_name}"
+            )
+        return False  # Don't suppress exception
