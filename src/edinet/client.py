@@ -19,7 +19,6 @@ from src.config import (
     HTTP_SERVER_ERROR_END,
     HTTP_SUCCESS,
     MAX_RETRIES,
-    SUPPORTED_DOC_TYPES,
 )
 from src.edinet.decorators import handle_api_errors
 from src.edinet.funcs import filter_filings
@@ -150,10 +149,10 @@ class EdinetClient:
         if end_date is None:
             end_date = start_date
 
-        # Normalize filter parameters
-        edinet_codes = edinet_codes or []
-        filing_type_codes = filing_type_codes or []
-        excluded_filing_type_codes = excluded_filing_type_codes or []
+        # Normalize filter parameters - convert empty lists to None for proper filtering
+        edinet_codes = edinet_codes or None
+        filing_type_codes = filing_type_codes or None
+        excluded_filing_type_codes = excluded_filing_type_codes or None
 
         matching_docs = []
         current_date = start_date

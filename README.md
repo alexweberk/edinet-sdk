@@ -45,7 +45,7 @@ recent_filings = client.list_recent_filings(lookback_days=7)
 
 # Filter by company
 company_filings = client.filter_filings(
-    recent_filings, 
+    recent_filings,
     filer_names=["Toyota Motor Corporation"]
 )
 

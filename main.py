@@ -26,13 +26,6 @@ def parse_args():
         default=7,
         help="Number of days to look back for recent filings",
     )
-    parser.add_argument(
-        "--filing-types",
-        type=str,
-        default=None,
-        required=False,
-        help="Comma-separated list of filing type codes to include (e.g., 160,180)",
-    )
 
     return parser.parse_args()
 
