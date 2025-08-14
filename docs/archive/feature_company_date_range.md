@@ -28,8 +28,8 @@ def get_structured_data_for_company_date_range(
     edinet_code: str,
     start_date: datetime.date | str,
     end_date: datetime.date | str,
-    doc_type_codes: Optional[list[str]] = None,
-    excluded_doc_type_codes: Optional[list[str]] = None,
+    filing_type_codes: Optional[list[str]] = None,
+    excluded_filing_type_codes: Optional[list[str]] = None,
     require_sec_code: bool = True,
     download_dir: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -71,7 +71,7 @@ Example:
 ### Acceptance criteria
 - Given valid inputs, function returns a list where each item is a structured dict built by the existing processors, filtered to the specified `edinet_code`.
 - CLI prints valid JSON array to stdout when flags are used.
-- Works for multiple `doc_type_codes` or defaults to all supported when not provided.
+- Works for multiple `filing_type_codes` or defaults to all supported when not provided.
 - No changes to existing behavior when flags are not passed.
 
 ### Out of scope

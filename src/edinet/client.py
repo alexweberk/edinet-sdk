@@ -45,9 +45,9 @@ class EdinetClient:
     Simplified EDINET API client with minimal, reusable methods.
 
     Core Methods:
-    - list_docs(): Search and filter document metadata for date/date range
-    - get_doc(): Download a single document by ID
-    - download_documents(): Download multiple documents to local storage
+    - list_filings(): Search and filter document metadata for date/date range
+    - get_filing(): Download a single document by ID
+    - download_filings(): Download multiple documents to local storage
     - save_bytes(): Save bytes data to a file with error handling
 
     """
@@ -88,13 +88,13 @@ class EdinetClient:
 
     # PUBLIC METHODS
     @handle_api_errors
-    def list_docs(
+    def list_filings(
         self,
         start_date: datetime.date,
         end_date: datetime.date | None = None,
         edinet_codes: list[str] | None = None,
-        doc_type_codes: list[str] | None = None,
-        excluded_doc_type_codes: list[str] | None = None,
+        filing_type_codes: list[str] | None = None,
+        excluded_filing_type_codes: list[str] | None = None,
         require_sec_code: bool = False,
     ) -> list[FilingMetadata]:
         """
@@ -104,8 +104,8 @@ class EdinetClient:
             start_date: Start date (or single date if end_date is None).
             end_date: End date for range queries. If None, queries single date.
             edinet_codes: List of EDINET codes to filter by.
-            doc_type_codes: List of document type codes to filter by.
-            excluded_doc_type_codes: List of document type codes to exclude.
+            filing_type_codes: List of document type codes to filter by.
+            excluded_filing_type_codes: List of document type codes to exclude.
             require_sec_code: Whether to require a security code.
 
         Returns:
@@ -117,8 +117,8 @@ class EdinetClient:
 
         # Normalize filter parameters
         edinet_codes = edinet_codes or []
-        doc_type_codes = doc_type_codes or []
-        excluded_doc_type_codes = excluded_doc_type_codes or []
+        filing_type_codes = filing_type_codes or []
+        excluded_filing_type_codes = excluded_filing_type_codes or []
 
         matching_docs = []
         current_date = start_date
@@ -138,8 +138,8 @@ class EdinetClient:
                     filtered_docs = self._filter_documents(
                         docs_res.results,
                         edinet_codes,
-                        doc_type_codes,
-                        excluded_doc_type_codes,
+                        filing_type_codes,
+                        excluded_filing_type_codes,
                         require_sec_code,
                     )
                     matching_docs.extend(filtered_docs)
@@ -209,13 +209,13 @@ class EdinetClient:
             raise EdinetDocumentFetchError(f"Failed to fetch zip bytes for {doc_id}.")
         return zip_bytes
 
-    def download_documents(
+    def download_filings(
         self,
         filing_metadatas: list[FilingMetadata],
         download_dir: str | None = None,
     ) -> None:
         """
-        Download all documents in the provided list.
+        Download all filings in the provided list.
 
         Args:
             filing_metadatas: The metadata of the documents to download.
@@ -256,10 +256,10 @@ class EdinetClient:
 
     def get_most_recent_documents(
         self,
-        doc_type_codes: list[str],
+        filing_type_codes: list[str],
         days_back: int = DAYS_BACK,
         edinet_codes: list[str] | None = None,
-        excluded_doc_type_codes: list[str] | None = None,
+        excluded_filing_type_codes: list[str] | None = None,
         require_sec_code: bool = True,
     ) -> tuple[list[FilingMetadata], datetime.date | None]:
         """
@@ -267,10 +267,10 @@ class EdinetClient:
         Searches back day by day up to `days_back`.
 
         Args:
-            doc_type_codes: List of document type codes to filter by.
+            filing_type_codes: List of document type codes to filter by.
             days_back: Number of days to search back.
             edinet_codes: List of EDINET codes to filter by.
-            excluded_doc_type_codes: List of document type codes to exclude.
+            excluded_filing_type_codes: List of document type codes to exclude.
             require_sec_code: Whether to require a security code.
 
         Returns:
@@ -292,12 +292,12 @@ class EdinetClient:
             self.logger.info(f"Fetching documents for {date_to_check}...")
             try:
                 # Get documents for a single date
-                docs = self.list_docs(
+                docs = self.list_filings(
                     start_date=date_to_check,
                     end_date=date_to_check,
-                    doc_type_codes=doc_type_codes,
+                    filing_type_codes=filing_type_codes,
                     edinet_codes=edinet_codes,
-                    excluded_doc_type_codes=excluded_doc_type_codes,
+                    excluded_filing_type_codes=excluded_filing_type_codes,
                     require_sec_code=require_sec_code,
                 )
 
@@ -358,8 +358,8 @@ class EdinetClient:
     #     edinet_code: str,
     #     start_date: datetime.date | str,
     #     end_date: datetime.date | str,
-    #     doc_type_codes: list[str] | None = None,
-    #     excluded_doc_type_codes: list[str] | None = None,
+    #     filing_type_codes: list[str] | None = None,
+    #     excluded_filing_type_codes: list[str] | None = None,
     #     require_sec_code: bool = True,
     #     download_dir: str | None = None,
     # ) -> list[dict[str, Any]]:
@@ -374,8 +374,8 @@ class EdinetClient:
     #         edinet_code: EDINET code for the company to fetch documents for
     #         start_date: Start date for the date range (datetime.date or YYYY-MM-DD string)
     #         end_date: End date for the date range (datetime.date or YYYY-MM-DD string)
-    #         doc_type_codes: Optional list of document type codes to include
-    #         excluded_doc_type_codes: Optional list of document type codes to exclude
+    #         filing_type_codes: Optional list of document type codes to include
+    #         excluded_filing_type_codes: Optional list of document type codes to exclude
     #         require_sec_code: Whether to require a security code (default: True)
     #         download_dir: Directory to download files to (auto-generated if None)
 
@@ -429,12 +429,12 @@ class EdinetClient:
     #     self.logger.info(f"Using download directory: {download_dir}")
 
     #     # Fetch documents for the company within the date range
-    #     docs_metadata = self.list_docs(
+    #     docs_metadata = self.list_filings(
     #         start_date=start_date_parsed,
     #         end_date=end_date_parsed,
     #         edinet_codes=[edinet_code],  # Filter by single EDINET code
-    #         doc_type_codes=doc_type_codes,
-    #         excluded_doc_type_codes=excluded_doc_type_codes,
+    #         filing_type_codes=filing_type_codes,
+    #         excluded_filing_type_codes=excluded_filing_type_codes,
     #         require_sec_code=require_sec_code,
     #     )
 
@@ -447,12 +447,12 @@ class EdinetClient:
     #     self.logger.info(f"Found {len(docs_metadata)} documents for {edinet_code}")
 
     #     # Download the documents
-    #     self.download_documents(docs_metadata, download_dir)
+    #     self.download_filings(docs_metadata, download_dir)
 
     #     # Process the downloaded zip files into structured data
     #     # Use all supported document types for processing
     #     structured_document_data_list = BaseProcessor.process_zip_directory(
-    #         download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
+    #         download_dir, filing_type_codes=list(SUPPORTED_DOC_TYPES.keys())
     #     )
 
     #     self.logger.info(
@@ -513,8 +513,8 @@ class EdinetClient:
         self,
         docs: list[FilingMetadata],
         edinet_codes: list[str],
-        doc_type_codes: list[str],
-        excluded_doc_type_codes: list[str],
+        filing_type_codes: list[str],
+        excluded_filing_type_codes: list[str],
         require_sec_code: bool,
     ) -> list[FilingMetadata]:
         """
@@ -536,9 +536,9 @@ class EdinetClient:
             # Apply filters
             if edinet_codes and doc.edinetCode not in edinet_codes:
                 continue
-            if doc_type_codes and doc.docTypeCode not in doc_type_codes:
+            if filing_type_codes and doc.docTypeCode not in filing_type_codes:
                 continue
-            if doc.docTypeCode in excluded_doc_type_codes:
+            if doc.docTypeCode in excluded_filing_type_codes:
                 continue
             if require_sec_code and doc.secCode is None:
                 continue

@@ -48,10 +48,10 @@ def parse_args():
 def run_company_date_range_query(args):
     """Run the company date range query based on CLI arguments."""
     # Parse doc types if provided
-    doc_type_codes = None
+    filing_type_codes = None
     if args.doc_types:
-        doc_type_codes = [code.strip() for code in args.doc_types.split(",")]
-        logger.info(f"Filtering for document types: {doc_type_codes}")
+        filing_type_codes = [code.strip() for code in args.doc_types.split(",")]
+        logger.info(f"Filtering for document types: {filing_type_codes}")
 
     try:
         edinet_client = EdinetClient()
@@ -94,7 +94,7 @@ def run_demo() -> None:
     # get_structured_data_from_zip_directory can create meaningful structured data.
     # If you want to fetch other types, ensure GenericReportProcessor is sufficient,
     # or add specific processors in document_processors.py
-    doc_type_codes_to_fetch = [
+    filing_type_codes_to_fetch = [
         # "140",  # Quarterly Reports
         "160",  # Semi-Annual Reports
         "180",  # Extraordinary Reports
@@ -108,7 +108,7 @@ def run_demo() -> None:
     docs_metadata = edinet_client.list_docs(
         start_date=datetime.now() - timedelta(days=days_back),
         end_date=datetime.now(),
-        doc_type_codes=doc_type_codes_to_fetch,
+        filing_type_codes=filing_type_codes_to_fetch,
     )
 
     if not docs_metadata:
@@ -126,7 +126,7 @@ def run_demo() -> None:
     # We pass the keys of SUPPORTED_DOC_TYPES because process_zip_directory
     # uses process_structured_data_from_raw_csv which dispatches based on these codes.
     structured_document_data_list = BaseProcessor.process_zip_directory(
-        download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
+        download_dir, filing_type_codes=list(SUPPORTED_DOC_TYPES.keys())
     )
 
     # Filter out metadata for documents that failed processing
