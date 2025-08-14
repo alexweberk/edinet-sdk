@@ -4,7 +4,9 @@ import logging
 from collections.abc import Hashable
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+from src.utils import clean_text
 
 StructuredDocData = dict[str, Any]
 
@@ -71,6 +73,14 @@ class FilingMetadata(BaseModel):
     englishDocFlag: str  # noqa: N815
     csvFlag: str  # noqa: N815
     legalStatus: str  # noqa: N815
+
+    @field_validator(
+        "filerName", "docDescription", "currentReportReason", mode="before"
+    )
+    @classmethod
+    def clean_text_fields(cls, v):
+        """Clean text fields that may contain full-width spaces."""
+        return clean_text(v)
 
 
 class Filing(BaseModel):

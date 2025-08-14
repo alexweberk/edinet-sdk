@@ -12,28 +12,10 @@ from src.config import (
     CSV_EXTENSION,
     CSV_SEPARATOR,
     MACOS_METADATA_DIR,
-    TEXT_REPLACEMENTS,
 )
 from src.models import CsvFileAsRecords, File, Filing, FilingMetadata
 
 logger = logging.getLogger(__name__)
-
-
-def clean_text(text: str | None) -> str | None:
-    """Clean and normalize text from disclosures."""
-    if text is None:
-        return None
-    # replace full-width space with regular space
-    text = text.replace(
-        TEXT_REPLACEMENTS["FULL_WIDTH_SPACE"], TEXT_REPLACEMENTS["REGULAR_SPACE"]
-    )
-    # remove excessive whitespace
-    # text = re.sub(r"\s+", " ", text).strip()
-    # remove unprintable characters
-    text = text.replace("\u3000", "")
-    # replace specific Japanese punctuation with Western equivalents for consistency
-    # return text.replace('。', '. ').replace('、', ', ')
-    return text
 
 
 class BaseProcessor:

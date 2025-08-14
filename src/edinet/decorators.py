@@ -2,8 +2,6 @@ import functools
 import logging
 from collections.abc import Callable
 
-from src.config import LOG_FORMAT
-
 
 def handle_api_errors[T](func: Callable[..., T]) -> Callable[..., T]:
     """Decorator to handle common API errors with standardized logging."""
@@ -30,12 +28,3 @@ def handle_api_errors[T](func: Callable[..., T]) -> Callable[..., T]:
             raise
 
     return wrapper
-
-
-def setup_logging() -> None:
-    """Configures basic logging for the application."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format=LOG_FORMAT,
-        handlers=[logging.StreamHandler()],
-    )
