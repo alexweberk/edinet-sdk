@@ -8,14 +8,14 @@ This is a Python project using UV for package management with pyproject.toml con
 
 **Running main.py:**
 ```bash
-uv run python main.py                    # Run demo mode
+uv run python main.py                    # Run with default settings
 uv run python main.py --help            # Show available CLI options
 ```
 
-**Company date range query mode:**
+**Company filtering mode:**
 ```bash
-uv run python main.py --edinet-code E12345 --start-date 2024-01-01 --end-date 2024-01-31
-uv run python main.py --edinet-code E12345 --start-date 2024-01-01 --end-date 2024-01-31 --doc-types "160,180" --output results.json
+uv run python main.py --company-name "Toyota Motor Corporation"
+uv run python main.py --company-name "Sony Group" --lookback-days 14 --filing-types "160,180"
 ```
 
 **Installing dependencies:**
@@ -44,42 +44,38 @@ This project provides a Python SDK for interacting with Japan's EDINET API v2 to
 ### Core Architecture Components
 
 **Data Flow Pipeline:**
-1. **EDINET API Interaction** (`src/edinet/client.py`) → Fetch document lists and download ZIP files
-2. **Data Processing** (`src/utils.py`) → Extract and clean CSV data from ZIP archives
-3. **Document Processing** (`src/processors/`) → Transform raw CSV into structured data
-4. **Service Layer** (`src/services.py`) → Orchestrate the complete workflow
+1. **EDINET API Interaction** (`src/edinet/client.py`) → Fetch filing metadata and download documents
+2. **Filing Filtering** (`src/edinet/funcs.py`) → Filter filings by criteria (company, type, etc.)
+3. **Data Processing** (`src/utils.py`) → Extract and clean CSV data from ZIP archives
+4. **Document Processing** (`src/processors/base_processor.py`) → Transform raw CSV into structured data
 
 ### Key Modules
 
 - **`src/edinet/client.py`**: EDINET API client with retry logic and error handling
-- **`src/processors/`**: Document-type-specific processors that transform raw CSV data:
-  - `base_processor.py`: Abstract base class defining the processor interface
-  - `semiannual_processor.py`: Handles Semi-Annual Reports (160)
-  - `extraordinary_processor.py`: Handles Extraordinary Reports (180)
-  - `generic_processor.py`: Fallback processor for unsupported document types
-- **`src/services.py`**: High-level service functions orchestrating the complete workflow
-- **`src/utils.py`**: File processing utilities (encoding detection, CSV parsing, text cleaning)
+- **`src/edinet/decorators.py`**: API error handling decorators
+- **`src/edinet/funcs.py`**: Filing filtering utilities and helper functions
+- **`src/processors/base_processor.py`**: Consolidated document processor with all processing logic
+- **`src/utils.py`**: File processing utilities (encoding detection, CSV parsing, text cleaning, logging setup)
 - **`src/config.py`**: Configuration including API URLs, constants, and document types
-- **`src/exceptions.py`**: Custom exception classes for error handling
-- **`src/error_handlers.py`**: Error handling decorators and context managers
-- **`src/logging_config.py`**: Centralized logging configuration
+- **`src/models.py`**: Pydantic data models for API responses and document metadata
 
 ### Document Processing System
 
-The system uses a processor mapping pattern with static methods in `BaseProcessor.process_structured_data_from_raw_csv()`:
-- Document type codes (160, 180, etc.) map to specific processor classes
-- Each processor uses static methods with explicit data parameters (no instance variables)
-- Falls back to `GenericReportProcessor` for unsupported document types
-- All processors inherit from `BaseProcessor` and implement static `process(all_records, doc_id, doc_type_code)` method
+The processing system has been simplified to use a single consolidated processor:
+- All document processing logic is now contained in `BaseProcessor` in `src/processors/base_processor.py`
+- Uses static methods with explicit data parameters (no instance variables)
 - Processors are purely functional - they don't maintain any internal state
+- Generic processing handles all document types with common extraction patterns
+- Document-specific logic can be added as static methods within the base processor
 
 ### SDK Architecture
 
-The SDK provides a clean, class-based interface:
+The SDK provides a clean, simplified interface:
 - `EdinetClient` class handles all API interactions with comprehensive error handling
 - Built-in retry logic and proper logging throughout
-- Document processors transform raw CSV data into structured formats
-- Backward compatibility functions maintain existing API surface
+- New methods: `list_recent_filings()` and `filter_filings()` for easier workflow
+- Consolidated document processing in a single processor class
+- Functional approach with static methods for better testability
 
 ## Configuration Requirements
 
@@ -91,22 +87,19 @@ The project uses Pydantic-based configuration validation with comprehensive erro
 **Optional Processing Configuration:**
 - `MAX_RETRIES`: Maximum retry attempts (default: 3)
 - `DELAY_SECONDS`: Delay between retries in seconds (default: 5)
-- `DAYS_BACK`: Days to search back for recent documents (default: 7)
 
 ## Entry Points and CLI Usage
 
-The application has two main modes:
+The application provides a simplified filing search interface:
 
-**1. Demo Mode (default):**
-- Fetches recent documents of specified types
-- Downloads and processes them
+**Default Mode:**
+- Lists recent filings from the last 7 days
 - Usage: `uv run python main.py`
 
-**2. Company Date Range Query Mode:**
-- Fetches documents for a specific company within a date range
-- Supports document type filtering
-- Outputs structured JSON data
-- Usage: `uv run python main.py --edinet-code <CODE> --start-date <DATE> --end-date <DATE>`
+**Company Filtering Mode:**
+- Fetches recent filings and filters by company name
+- Supports custom lookback period and filing type filtering
+- Usage: `uv run python main.py --company-name "Company Name" --lookback-days 14 --filing-types "160,180"`
 
 ## Supported Document Types
 
@@ -120,37 +113,40 @@ Defined in `src/config.py:SUPPORTED_DOC_TYPES`:
 
 ## Using the SDK
 
-The SDK provides both class-based and function-based interfaces:
+The SDK provides a simplified class-based interface:
 
 ```python
 from src.edinet.client import EdinetClient
-import datetime
 
-# Class-based usage (recommended)
+# Basic usage - get recent filings
 client = EdinetClient()
-docs = client.get_documents_for_date_range(
+recent_filings = client.list_recent_filings(lookback_days=7)
+
+# Filter filings by company
+filtered_filings = client.filter_filings(
+    recent_filings, 
+    filer_names=["Toyota Motor Corporation"]
+)
+
+# Get filings for a specific date range
+filings = client.list_filings(
     start_date=datetime.date(2024, 1, 1),
     end_date=datetime.date(2024, 1, 31),
     edinet_codes=['E12345']
 )
-client.download_documents(docs)
 
-# Function-based usage (for backward compatibility)
-from src.edinet.client import get_documents_for_date_range, download_documents
-docs = get_documents_for_date_range(
-    start_date=datetime.date(2024, 1, 1),
-    end_date=datetime.date(2024, 1, 31)
-)
-download_documents(docs)
+# Download filings
+client.download_filings(filings, "downloads/")
 ```
 
-## Adding New Document Processors
+## Adding Document-Specific Processing Logic
 
-1. Create class inheriting from `BaseProcessor` in `src/processors/`
-2. Implement static `process(all_records, doc_id, doc_type_code)` method with document-specific data extraction logic
-3. Use static helper methods from `BaseProcessor`: `get_value_by_id()`, `get_all_text_blocks()`, `_get_common_metadata()`
-4. Add to `processor_map` in `BaseProcessor.process_structured_data_from_raw_csv()`
-5. Import the new processor class in the `process_structured_data_from_raw_csv()` method
+Document processing is now consolidated in the `BaseProcessor` class. To add new processing logic:
+
+1. Add static methods to `BaseProcessor` in `src/processors/base_processor.py`
+2. Implement document-specific extraction using existing helper methods: `get_value_by_id()`, `get_all_text_blocks()`, `_get_common_metadata()`
+3. Use conditional logic based on `doc_type_code` parameter to handle different document types
+4. All methods should be static and functional - no instance variables
 
 ## Project Structure
 
@@ -159,20 +155,17 @@ edinet-sdk/
 ├── src/                           # Main source code
 │   ├── __init__.py                # Package initialization
 │   ├── config.py                  # Configuration and constants
-│   ├── exceptions.py              # Custom exception classes
-│   ├── error_handlers.py          # Error handling decorators
-│   ├── logging_config.py          # Centralized logging setup
-│   ├── services.py                # High-level service orchestration
-│   ├── utils.py                   # File processing utilities
+│   ├── models.py                  # Pydantic data models
+│   ├── utils.py                   # File processing utilities and logging setup
 │   ├── edinet/                    # EDINET API integration
 │   │   ├── __init__.py            # Package initialization
-│   │   └── client.py              # EDINET API client with retry logic
-│   └── processors/                # Document-specific processors
+│   │   ├── client.py              # EDINET API client with retry logic
+│   │   ├── decorators.py          # API error handling decorators
+│   │   ├── funcs.py               # Filing filtering utilities
+│   │   └── doc_metadata_example.py # Example document metadata
+│   └── processors/                # Document processing
 │       ├── __init__.py            # Package initialization
-│       ├── base_processor.py      # Abstract base class
-│       ├── generic_processor.py   # Fallback processor
-│       ├── semiannual_processor.py # Semi-Annual Reports (160)
-│       └── extraordinary_processor.py # Extraordinary Reports (180)
+│       └── base_processor.py      # Consolidated document processor
 ├── main.py                        # CLI entry point
 ├── main.ipynb                     # Jupyter notebook for exploration
 ├── pyproject.toml                 # UV package configuration
@@ -184,26 +177,29 @@ edinet-sdk/
 
 The project implements comprehensive error handling:
 
-- **Custom Exceptions**: Specific exception types in `src/exceptions.py` for different error categories
-- **Error Decorators**: `@log_exceptions` decorator in `src/error_handlers.py` for consistent error logging
-- **Context Managers**: `ErrorContext` for scoped error handling
-- **Centralized Logging**: Consistent logging configuration across all modules
-- **Graceful Degradation**: Failed document processing doesn't stop the entire pipeline
+- **Custom Exceptions**: Specific exception types in `src/models.py` for different error categories
+- **Error Decorators**: `@handle_api_errors` decorator in `src/edinet/decorators.py` for API error handling
+- **Centralized Logging**: Logging setup in `src/utils.py` with consistent configuration
+- **Graceful Degradation**: Failed operations are logged and don't crash the entire pipeline
 
 ## Data Flow Details
 
-**1. Document Discovery:**
-- `EdinetClient.get_documents_for_date_range()` queries EDINET API for document metadata
-- Returns list of document metadata dictionaries with docID, docTypeCode, filerName, etc.
+**1. Filing Discovery:**
+- `EdinetClient.list_recent_filings()` or `EdinetClient.list_filings()` query EDINET API for filing metadata
+- Returns list of `FilingMetadata` objects with docID, docTypeCode, filerName, etc.
 
-**2. Document Download:**
-- `EdinetClient.download_documents()` downloads ZIP files to specified directory
+**2. Filing Filtering:**
+- `EdinetClient.filter_filings()` applies filtering criteria using `src/edinet/funcs.py`
+- Supports filtering by company name, EDINET codes, document types, etc.
+
+**3. Document Download:**
+- `EdinetClient.download_filings()` downloads ZIP files to specified directory
 - Uses filename format: `{docID}-{docTypeCode}-{filerName}.zip`
 
-**3. Document Processing:**
-- `services.get_structured_data_from_zip_directory()` processes all ZIP files in directory
+**4. Document Processing:**
+- `BaseProcessor` in `src/processors/base_processor.py` processes ZIP files
 - Extracts CSV files, skips auditor reports (jpaud* files)
-- Dispatches to appropriate processor based on document type code
+- Applies generic processing logic to extract structured data
 
 ## Python Coding Conventions
 - Use Python 3.12>= style type hinting. For example, use `str | None` instead of `Optional[str]`.
@@ -256,3 +252,27 @@ The project implements comprehensive error handling:
 - *Previous Flow*: Instantiate processor → Load data into instance → Call process()
 - *Current Flow*: Combine raw CSV data → Call static process(all_records, doc_id, doc_type_code)
 - *Result*: More predictable, easier to reason about, and follows functional programming principles
+
+## Implementation Learnings: Architecture Simplification Refactor
+
+### Key Insights from Consolidation
+
+**Module Organization Benefits**
+- *Problem*: Multiple processor files with similar patterns created maintenance overhead
+- *Solution*: Consolidated all processing logic into `BaseProcessor` with conditional logic
+- *Learning*: For this domain, generic processing with document-type-specific branches is more maintainable than separate classes
+
+**Import Structure Clarification**
+- *Problem*: `utils.py` was ambiguous - contained both file utilities and API decorators
+- *Solution*: Split into `src/utils.py` (file processing) and `src/edinet/decorators.py` (API-specific)
+- *Learning*: Clear module boundaries make the codebase more navigable and logical
+
+**CLI Simplification Impact**
+- *Previous*: Complex date range and output file handling
+- *Current*: Simple company filtering with lookback days
+- *Result*: More intuitive user experience focused on common use cases
+
+**Functional Programming Benefits**
+- *Achievement*: All processing methods are now pure functions with explicit parameters
+- *Benefit*: Easier testing, debugging, and reasoning about data flow
+- *Learning*: Financial document processing is inherently functional - no need for stateful objects

@@ -11,19 +11,19 @@ A Python SDK for fetching and processing Japanese corporate financial disclosure
 
 ## CLI Usage
 
-**Demo mode (fetches recent documents):**
+**Default mode (lists recent filings):**
 ```bash
 uv run python main.py
 ```
 
-**Company date range query:**
+**Company filtering mode:**
 ```bash
-uv run python main.py --edinet-code <EDINET_CODE> --start-date <YYYY-MM-DD> --end-date <YYYY-MM-DD>
+uv run python main.py --company-name "Toyota Motor Corporation"
 ```
 
 **Optional flags:**
-- `--doc-types`: Comma-separated document type codes (e.g., "160,180")
-- `--output`: Output file path for JSON results
+- `--lookback-days`: Number of days to look back (default: 7)
+- `--filing-types`: Comma-separated filing type codes (e.g., "160,180")
 
 ## Development
 
@@ -32,23 +32,35 @@ uv run ruff check .      # Linting
 uv run ruff format .     # Formatting
 ```
 
-## TODO
-- Add logic to handle document types and use the correct processor to return structured data
+## SDK Usage
 
 ```python
+from src.edinet.client import EdinetClient
+
+# Initialize client
 client = EdinetClient()
 
-docs_list = client.list_docs(edinet_code=12345, start_date='2024-05-01', end_date='2025-04-30')
-client.download(docs_list)
+# Get recent filings
+recent_filings = client.list_recent_filings(lookback_days=7)
 
-# OR
-docs_list: list[DocsMeta] = client.list_docs(edinet_code=12345, start_date='2024-05-01', end_date='2025-04-30')
-docs: list[Doc] = client.get_docs(docs_list)
+# Filter by company
+company_filings = client.filter_filings(
+    recent_filings, 
+    filer_names=["Toyota Motor Corporation"]
+)
+
+# Download filings
+client.download_filings(company_filings, "downloads/")
 ```
 
-- Rename Doc to Filing and DocMetadata to FilingMetadata
-- Rename File to Doc
+## Architecture
 
+This SDK provides a simplified interface to Japan's EDINET API v2:
+
+- **`EdinetClient`**: Main API client with methods for listing, filtering, and downloading filings
+- **Filtering**: Built-in support for filtering by company name, document type, date ranges
+- **Processing**: Consolidated document processor for extracting structured data from CSV files
+- **Error Handling**: Comprehensive retry logic and error handling throughout
 
 ## Disclaimer
 
