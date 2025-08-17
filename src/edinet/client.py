@@ -13,12 +13,12 @@ from src.config import (
     DEFAULT_DOWNLOAD_DIR,
     DELAY_SECONDS,
     EDINET_API_BASE_URL,
-    EDINET_API_KEY,
     EDINET_DOCUMENT_API_BASE_URL,
     HTTP_CLIENT_ERROR_START,
     HTTP_SERVER_ERROR_END,
     HTTP_SUCCESS,
     MAX_RETRIES,
+    validate_api_key,
 )
 from src.edinet.decorators import handle_api_errors
 from src.edinet.funcs import filter_filings
@@ -64,21 +64,18 @@ class EdinetClient:
         Initialize the EDINET client.
 
         Args:
-            api_key: EDINET API key. If None, uses EDINET_API_KEY from config.
+            api_key: EDINET API key. If None, validates and uses EDINET_API_KEY environment variable.
             max_retries: Maximum number of retry attempts for failed requests.
             delay_seconds: Delay between retry attempts in seconds.
             download_dir: Default directory for downloading documents.
             timeout: Request timeout in seconds.
         """
-        self.api_key = api_key or EDINET_API_KEY
+        self.api_key = api_key or validate_api_key()
         self.max_retries = max_retries
         self.delay_seconds = delay_seconds
         self.download_dir = download_dir
         self.timeout = timeout
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
-
-        if not self.api_key:
-            raise ValidationError("EDINET API key is required")
 
         # Ensure download directory exists
         os.makedirs(self.download_dir, exist_ok=True)
@@ -208,8 +205,12 @@ class EdinetClient:
             except EdinetAuthenticationError:
                 # Re-raise authentication errors immediately to stop execution
                 raise
+            except (EdinetConnectionError, EdinetRetryExceededError, EdinetDocumentFetchError) as e:
+                self.logger.error(f"API error processing documents for {current_date}: {e}")
+            except (ValueError, TypeError) as e:
+                self.logger.error(f"Data validation error for {current_date}: {e}")
             except Exception as e:
-                self.logger.error(f"Error processing documents for {current_date}: {e}")
+                self.logger.error(f"Unexpected error processing documents for {current_date}: {e}")
             finally:
                 current_date += datetime.timedelta(days=1)
 
@@ -313,8 +314,12 @@ class EdinetClient:
             try:
                 zip_bytes = self.get_zip_bytes(filing_metadata)
                 self.save_bytes(zip_bytes, filepath)
+            except (EdinetConnectionError, EdinetRetryExceededError, EdinetDocumentFetchError) as e:
+                self.logger.error(f"API error downloading {filename}: {e}")
+            except OSError as e:
+                self.logger.error(f"File system error saving {filename}: {e}")
             except Exception as e:
-                self.logger.error(f"Failed to download {filename}: {e}")
+                self.logger.error(f"Unexpected error downloading {filename}: {e}")
 
         self.logger.info("Download complete")
 
@@ -333,8 +338,11 @@ class EdinetClient:
             with open(filepath, "wb") as f:
                 f.write(data)
             self.logger.info(f"Saved file: {filepath}")
+        except OSError as e:
+            self.logger.error(f"File system error saving {filepath}: {e}")
+            raise
         except Exception as e:
-            self.logger.error(f"Error saving file {filepath}: {e}")
+            self.logger.error(f"Unexpected error saving file {filepath}: {e}")
             raise
 
     # PRIVATE METHODS
@@ -429,8 +437,8 @@ class EdinetClient:
                         try:
                             error_body = response.text
                             self.logger.error(f"Error body: {error_body}")
-                        except Exception:
-                            pass
+                        except (AttributeError, UnicodeDecodeError):
+                            self.logger.warning("Could not decode error response body")
 
                         # Check if retryable error
                         if (
@@ -465,6 +473,16 @@ class EdinetClient:
                         f"Failed {url} after {self.max_retries} attempts"
                     ) from e
 
+            except (ValueError, TypeError, KeyError) as e:
+                self.logger.error(f"Data processing error for {url}: {e}")
+                if attempt < self.max_retries - 1:
+                    self.logger.warning(f"Retrying in {self.delay_seconds}s...")
+                    time.sleep(self.delay_seconds)
+                else:
+                    self.logger.error(f"Max retries reached for {url}")
+                    raise EdinetConnectionError(
+                        f"Failed {url} after {self.max_retries} attempts"
+                    ) from e
             except Exception as e:
                 self.logger.error(f"Unexpected error in {url}: {e}")
                 if attempt < self.max_retries - 1:

@@ -6,10 +6,22 @@ from dotenv import load_dotenv
 load_dotenv(".env", override=True)
 
 # EDINET API configuration
-EDINET_API_KEY: str = os.getenv("EDINET_API_KEY", "")
 
-if not EDINET_API_KEY:
-    raise ValueError("EDINET_API_KEY environment variable is required")
+
+def validate_api_key() -> str:
+    """
+    Validate that EDINET_API_KEY is available.
+
+    Returns:
+        The API key if valid.
+
+    Raises:
+        ValueError: If EDINET_API_KEY is not set.
+    """
+    api_key = os.getenv("EDINET_API_KEY", "")
+    if not api_key:
+        raise ValueError("EDINET_API_KEY environment variable is required")
+    return api_key
 
 # Processing configuration
 MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "3"))

@@ -152,7 +152,7 @@ class BaseProcessor:
         zip_file_path: str,
         filing_metadata: FilingMetadata,
     ) -> Filing | None:
-        """Read a zipfile and return a dictionary of filename to records."""
+        """Read a zipfile and return a Filing object."""
         try:
             with open(zip_file_path, "rb") as f:
                 zip_bytes = f.read()
@@ -172,7 +172,7 @@ class BaseProcessor:
         zip_directory_path: str,
         filing_metadata: FilingMetadata,
     ) -> list[Filing] | None:
-        """Read zip files from a directory and return a dictionary of filename to records."""
+        """Read zip files from a directory and return a list of Filing objects."""
         all_filings: list[Filing] = []
         for zip_file_path in os.listdir(zip_directory_path):
             filing = cls.zip_file_to_filing(
