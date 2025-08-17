@@ -8,7 +8,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="EDINET SDK - Fetch and process Japanese financial disclosure documents"

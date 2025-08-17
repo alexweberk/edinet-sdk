@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Hashable
+from types import TracebackType
 from typing import Any
 
 from pydantic import BaseModel, field_validator
@@ -78,7 +79,7 @@ class FilingMetadata(BaseModel):
         "filerName", "docDescription", "currentReportReason", mode="before"
     )
     @classmethod
-    def clean_text_fields(cls, v):
+    def clean_text_fields(cls, v: str | None) -> str | None:
         """Clean text fields that may contain full-width spaces."""
         return clean_text(v)
 
@@ -190,20 +191,25 @@ class ErrorContext:
         operation_name: str,
         logger_instance: logging.Logger,
         reraise: bool = True,
-    ):
+    ) -> None:
         self.operation_name = operation_name
         self.logger = logger_instance
         self.reraise = reraise
 
-    def __enter__(self):
+    def __enter__(self) -> "ErrorContext":
         self.logger.debug(f"Starting operation: {self.operation_name}")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         if exc_type is not None:
             self.logger.error(
                 f"Operation '{self.operation_name}' failed: {exc_val}",
-                exc_info=(exc_type, exc_val, exc_tb),
+                exc_info=exc_val,
             )
             if not self.reraise:
                 return True  # Suppress exception
@@ -211,4 +217,4 @@ class ErrorContext:
             self.logger.debug(
                 f"Operation completed successfully: {self.operation_name}"
             )
-        return False  # Don't suppress exception
+        return None  # Don't suppress exception

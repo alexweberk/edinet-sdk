@@ -71,6 +71,15 @@ class EdinetClient:
             timeout: Request timeout in seconds.
         """
         self.api_key = api_key or validate_api_key()
+
+        # Validate numeric parameters
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+        if delay_seconds < 0:
+            raise ValueError("delay_seconds must be non-negative")
+        if timeout <= 0:
+            raise ValueError("timeout must be positive")
+
         self.max_retries = max_retries
         self.delay_seconds = delay_seconds
         self.download_dir = download_dir
@@ -108,6 +117,10 @@ class EdinetClient:
         Returns:
             List of document metadata that match the criteria from the last N days.
         """
+        # Validate lookback_days parameter
+        if lookback_days <= 0:
+            raise ValueError("lookback_days must be positive")
+
         end_date = datetime.date.today()
         start_date = end_date - datetime.timedelta(days=lookback_days - 1)
 
@@ -150,6 +163,10 @@ class EdinetClient:
         # Handle single date vs date range
         if end_date is None:
             end_date = start_date
+
+        # Validate date range
+        if start_date > end_date:
+            raise ValueError("start_date must be <= end_date")
 
         # Normalize filter parameters - convert empty lists to None for proper filtering
         edinet_codes = edinet_codes or None
