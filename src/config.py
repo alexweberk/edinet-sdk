@@ -23,10 +23,17 @@ def validate_api_key() -> str:
         raise ValueError("EDINET_API_KEY environment variable is required")
     return api_key
 
+
 # Processing configuration
 MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "3"))
 DELAY_SECONDS: int = int(os.getenv("DELAY_SECONDS", "5"))
 DAYS_BACK: int = int(os.getenv("DAYS_BACK", "7"))
+
+# Cache configuration
+CACHE_ENABLED: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+CACHE_DIR: str = os.getenv("CACHE_DIR", ".cache")
+CACHE_TTL_FILINGS: int = int(os.getenv("CACHE_TTL_FILINGS", "86400"))  # 24 hours
+CACHE_TTL_DOCUMENTS: int = int(os.getenv("CACHE_TTL_DOCUMENTS", "604800"))  # 7 days
 
 logging.info("Configuration loaded successfully")
 

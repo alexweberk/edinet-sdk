@@ -7,9 +7,14 @@ from typing import Any
 
 import httpx
 
+from src.cache import CacheManager
 from src.config import (
     API_CSV_DOCUMENT_TYPE,
     API_TYPE_METADATA_AND_RESULTS,
+    CACHE_DIR,
+    CACHE_ENABLED,
+    CACHE_TTL_DOCUMENTS,
+    CACHE_TTL_FILINGS,
     DEFAULT_DOWNLOAD_DIR,
     DELAY_SECONDS,
     EDINET_API_BASE_URL,
@@ -59,6 +64,8 @@ class EdinetClient:
         delay_seconds: int = DELAY_SECONDS,
         download_dir: str = DEFAULT_DOWNLOAD_DIR,
         timeout: int = 30,
+        enable_cache: bool = CACHE_ENABLED,
+        cache_dir: str = CACHE_DIR,
     ):
         """
         Initialize the EDINET client.
@@ -69,6 +76,8 @@ class EdinetClient:
             delay_seconds: Delay between retry attempts in seconds.
             download_dir: Default directory for downloading documents.
             timeout: Request timeout in seconds.
+            enable_cache: Whether to enable response caching.
+            cache_dir: Directory for cache files.
         """
         self.api_key = api_key or validate_api_key()
 
@@ -84,12 +93,18 @@ class EdinetClient:
         self.delay_seconds = delay_seconds
         self.download_dir = download_dir
         self.timeout = timeout
+        self.enable_cache = enable_cache
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+
+        # Initialize cache manager if caching is enabled
+        self.cache_manager = CacheManager(cache_dir) if enable_cache else None
 
         # Ensure download directory exists
         os.makedirs(self.download_dir, exist_ok=True)
+
+        cache_status = "enabled" if enable_cache else "disabled"
         self.logger.info(
-            f"EdinetClient initialized with download directory: {self.download_dir}"
+            f"EdinetClient initialized with download directory: {self.download_dir}, cache: {cache_status}"
         )
 
     # PUBLIC METHODS
@@ -222,12 +237,20 @@ class EdinetClient:
             except EdinetAuthenticationError:
                 # Re-raise authentication errors immediately to stop execution
                 raise
-            except (EdinetConnectionError, EdinetRetryExceededError, EdinetDocumentFetchError) as e:
-                self.logger.error(f"API error processing documents for {current_date}: {e}")
+            except (
+                EdinetConnectionError,
+                EdinetRetryExceededError,
+                EdinetDocumentFetchError,
+            ) as e:
+                self.logger.error(
+                    f"API error processing documents for {current_date}: {e}"
+                )
             except (ValueError, TypeError) as e:
                 self.logger.error(f"Data validation error for {current_date}: {e}")
             except Exception as e:
-                self.logger.error(f"Unexpected error processing documents for {current_date}: {e}")
+                self.logger.error(
+                    f"Unexpected error processing documents for {current_date}: {e}"
+                )
             finally:
                 current_date += datetime.timedelta(days=1)
 
@@ -276,6 +299,15 @@ class EdinetClient:
         Download a single document by ID and return raw bytes.
         """
         doc_id = filing_metadata.docID
+
+        # Check cache first if enabled
+        if self.cache_manager:
+            cache_key = f"document:{doc_id}:{API_CSV_DOCUMENT_TYPE}"
+            cached_bytes = self.cache_manager.get_binary(cache_key, CACHE_TTL_DOCUMENTS)
+            if cached_bytes:
+                self.logger.info(f"Cache hit for document {doc_id}")
+                return cached_bytes
+
         url = f"{EDINET_DOCUMENT_API_BASE_URL}/documents/{doc_id}"
         params = {
             "type": API_CSV_DOCUMENT_TYPE,
@@ -289,6 +321,13 @@ class EdinetClient:
         )
         if not zip_bytes:
             raise EdinetDocumentFetchError(f"Failed to fetch zip bytes for {doc_id}.")
+
+        # Cache the result if caching is enabled
+        if self.cache_manager:
+            cache_key = f"document:{doc_id}:{API_CSV_DOCUMENT_TYPE}"
+            if self.cache_manager.set_binary(cache_key, zip_bytes):
+                self.logger.info(f"Cached document {doc_id}")
+
         return zip_bytes
 
     def download_filings(
@@ -331,7 +370,11 @@ class EdinetClient:
             try:
                 zip_bytes = self.get_zip_bytes(filing_metadata)
                 self.save_bytes(zip_bytes, filepath)
-            except (EdinetConnectionError, EdinetRetryExceededError, EdinetDocumentFetchError) as e:
+            except (
+                EdinetConnectionError,
+                EdinetRetryExceededError,
+                EdinetDocumentFetchError,
+            ) as e:
                 self.logger.error(f"API error downloading {filename}: {e}")
             except OSError as e:
                 self.logger.error(f"File system error saving {filename}: {e}")
@@ -339,6 +382,46 @@ class EdinetClient:
                 self.logger.error(f"Unexpected error downloading {filename}: {e}")
 
         self.logger.info("Download complete")
+
+    def clear_cache(self) -> dict[str, int | str]:
+        """
+        Clear all cached data.
+
+        Returns:
+            Dictionary with cache clearing statistics.
+        """
+        if not self.cache_manager:
+            return {"files_removed": 0, "message": "Caching is disabled"}
+
+        files_removed = self.cache_manager.clear_all()
+        self.logger.info(f"Cleared {files_removed} cache files")
+        return {"files_removed": files_removed}
+
+    def clear_expired_cache(self) -> dict[str, int | str]:
+        """
+        Clear only expired cache entries.
+
+        Returns:
+            Dictionary with cache clearing statistics.
+        """
+        if not self.cache_manager:
+            return {"files_removed": 0, "message": "Caching is disabled"}
+
+        files_removed = self.cache_manager.clear_expired()
+        self.logger.info(f"Cleared {files_removed} expired cache files")
+        return {"files_removed": files_removed}
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """
+        Get cache statistics.
+
+        Returns:
+            Dictionary with cache statistics.
+        """
+        if not self.cache_manager:
+            return {"message": "Caching is disabled"}
+
+        return self.cache_manager.get_cache_stats()
 
     def save_bytes(self, data: bytes, filepath: str) -> None:
         """
@@ -375,6 +458,18 @@ class EdinetClient:
         """
         date_str = self._validate_date(date)
 
+        # Check cache first if enabled
+        if self.cache_manager:
+            cache_key = f"filings:{date_str}:{api_type}"
+            cached_response = self.cache_manager.get_json(cache_key, CACHE_TTL_FILINGS)
+            if cached_response:
+                self.logger.info(f"Cache hit for filings on {date_str}")
+                # Return appropriate response type based on cached data
+                if "results" in cached_response:
+                    return EdinetSuccessResponse.model_validate(cached_response)
+                else:
+                    return EdinetErrorResponse.model_validate(cached_response)
+
         url = f"{EDINET_API_BASE_URL}/documents.json"
         params = {
             "date": date_str,
@@ -383,6 +478,12 @@ class EdinetClient:
         }
 
         response = self._fetch_with_retry(url, params, return_content=False)
+
+        # Cache the raw response if caching is enabled
+        if self.cache_manager:
+            cache_key = f"filings:{date_str}:{api_type}"
+            if self.cache_manager.set_json(cache_key, response):
+                self.logger.info(f"Cached filings for {date_str}")
 
         if "results" not in response.keys():
             return EdinetErrorResponse.model_validate(response)

@@ -1,12 +1,9 @@
 {
   "version": "0.2",
-  "ignorePaths": [
-    "pyproject.toml"
-  ],
+  "ignorePaths": ["pyproject.toml"],
   "dictionaryDefinitions": [],
   "dictionaries": [],
   "words": [
-    "dotenv",
     "EDINET",
     "IFRS",
     "jpaud",
@@ -15,12 +12,23 @@
     "jpigp",
     "jppfs",
     "metadatas",
-    "ONELINER",
-    "resultset",
+
+    "resultset"
+  ],
+  "ignoreWords": [
+    "dotenv",
+    "funcs",
+    "lookback",
+    "pytest",
+    "mypy",
+    "httpx",
+    "Pydantic",
+    "pyproject",
+    "asyncio",
+    "conftest",
     "retryable",
     "undecoded",
     "xbrl"
   ],
-  "ignoreWords": [],
   "import": []
 }

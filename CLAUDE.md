@@ -45,18 +45,20 @@ This project provides a Python SDK for interacting with Japan's EDINET API v2 to
 
 **Data Flow Pipeline:**
 1. **EDINET API Interaction** (`src/edinet/client.py`) → Fetch filing metadata and download documents
-2. **Filing Filtering** (`src/edinet/funcs.py`) → Filter filings by criteria (company, type, etc.)
-3. **Data Processing** (`src/utils.py`) → Extract and clean CSV data from ZIP archives
-4. **Document Processing** (`src/processors/base_processor.py`) → Transform raw CSV into structured data
+2. **Caching Layer** (`src/cache.py`) → Cache API responses and documents to reduce redundant requests
+3. **Filing Filtering** (`src/edinet/funcs.py`) → Filter filings by criteria (company, type, etc.)
+4. **Data Processing** (`src/utils.py`) → Extract and clean CSV data from ZIP archives
+5. **Document Processing** (`src/processors/base_processor.py`) → Transform raw CSV into structured data
 
 ### Key Modules
 
-- **`src/edinet/client.py`**: EDINET API client with retry logic and error handling
+- **`src/edinet/client.py`**: EDINET API client with retry logic, error handling, and caching support
+- **`src/cache.py`**: File-based caching system with TTL support for API responses and documents
 - **`src/edinet/decorators.py`**: API error handling decorators
 - **`src/edinet/funcs.py`**: Filing filtering utilities and helper functions
 - **`src/processors/base_processor.py`**: Consolidated document processor with all processing logic
 - **`src/utils.py`**: File processing utilities (encoding detection, CSV parsing, text cleaning, logging setup)
-- **`src/config.py`**: Configuration including API URLs, constants, and document types
+- **`src/config.py`**: Configuration including API URLs, constants, document types, and cache settings
 - **`src/models.py`**: Pydantic data models for API responses and document metadata
 
 ### Document Processing System
@@ -77,6 +79,16 @@ The SDK provides a clean, simplified interface:
 - Consolidated document processing in a single processor class
 - Functional approach with static methods for better testability
 
+### Caching System
+
+The SDK includes a comprehensive caching layer to improve performance and reduce API calls:
+- **File-based caching** with TTL (Time To Live) support
+- **Automatic cache management** for both JSON metadata and binary document files
+- **Configurable TTL values** for different data types (filings: 24h, documents: 7 days)
+- **Cache management methods** for clearing expired or all cached data
+- **Transparent operation** - caching works automatically without changing API usage
+- **Filesystem-safe keys** using SHA256 hashing for cache file names
+
 ## Configuration Requirements
 
 The project uses Pydantic-based configuration validation with comprehensive error checking.
@@ -87,6 +99,12 @@ The project uses Pydantic-based configuration validation with comprehensive erro
 **Optional Processing Configuration:**
 - `MAX_RETRIES`: Maximum retry attempts (default: 3)
 - `DELAY_SECONDS`: Delay between retries in seconds (default: 5)
+
+**Optional Caching Configuration:**
+- `CACHE_ENABLED`: Enable/disable caching (default: true)
+- `CACHE_DIR`: Directory for cache files (default: .cache)
+- `CACHE_TTL_FILINGS`: TTL for filing metadata in seconds (default: 86400 = 24 hours)
+- `CACHE_TTL_DOCUMENTS`: TTL for document files in seconds (default: 604800 = 7 days)
 
 ## Entry Points and CLI Usage
 
@@ -137,6 +155,21 @@ filings = client.list_filings(
 
 # Download filings
 client.download_filings(filings, "downloads/")
+
+# Caching examples
+# Clear all cache
+cache_stats = client.clear_cache()
+print(f"Removed {cache_stats['files_removed']} cache files")
+
+# Clear only expired cache entries
+expired_stats = client.clear_expired_cache()
+
+# Get cache statistics
+stats = client.get_cache_stats()
+print(f"Cache contains {stats['total_files']} files using {stats['total_size_bytes']} bytes")
+
+# Disable caching for a specific client instance
+client_no_cache = EdinetClient(enable_cache=False)
 ```
 
 ## Adding Document-Specific Processing Logic
